@@ -6,41 +6,52 @@
 #----------------------------------------------------------------------
 # example usage:
 #
-# load the module
+# # load the module
 #
 #    use AdcircUtils::AdcGrid;
 #
-# create an AdcGrid object, which also loads the grid file.
+# # create an AdcGrid object,
 #
-#    $adcGrid=AdcGrid->new('fort.14');
+#    $adcGrid=AdcGrid->new();
 #
-# After you've you created the object you can do stuff with it. 
-# for example:
+# # load a grid file
 #
-# get the AGRID comment line
+#   $adcGrid->loadGrid('fort.14');
+#
+# # After you've you created the object and loaded a grid
+# # you can do stuff with it.
+# 
+# # for example:
+#
+# # get the AGRID comment line
 #
 #    $agrid=$adcGrid->getVAR('AGRID');
-# or   
-#    $agrid=$adcGrid->{AGRID};
+# # or   
+#    $agrid=$adcGrid->{AGRID};  # the object is just a hash ref
 #
-# get the number of elements
+# # get the number of elements
 # 
 #    $ne=$adcGrid->getVar('NE');
-# or   
+# # or   
 #    $ne=$adcGrid->{NE};
 #
-# get the position of a node 
+# # note: the variable names are for the most part identical
+# # to those used on the adcirc website to describe
+# # the fort.14 file.
+# 
+# # get the position of a node 
 #
 #    $someNodeNumber=784
-#    ($x,$y,$z)=$adcGrid->getNode($someNodeNumber);
+#    ($x,$y,$dp)=$adcGrid->getNode($someNodeNumber);
 #
-# # get the positions of a list of nodes
+# # get the positions all the nodes
 #
-#    @NIDS=(1,2,3,4,7,8,30);
-#    ($xref,$yref,$zref)=$adcGrid->getNode(\@NIDS);
+#    my $np = $adcGrid->getVar('NP');
+#    @NIDS=(1..$np);
+#    ($xref,$yref,$dpref)=$adcGrid->getNode(\@NIDS);
 #    @X=@{$xref};
 #    @Y=@{$yref};
-#    @Z=@{$zref};
+#    @DP=@{$dpref};
 #    
 # There is more you can do. Please read the comments below associated 
 # with the various methods to get a further description description of
@@ -77,10 +88,16 @@ use strict;
 # create a new AdcGrid object
 #
 # e.g.
-#  
-#  my $gridFileName='fort.14';
 #
 #  my $adcGrid = AdcGrid->new( $gridFileName );
+#
+#  ..and load a grid file e.g.
+#
+# e.g.
+#
+#  my $gridFileName='fort.14';
+#
+#  $adcGrid->loadGrid( $gridFileName );
 #
 #  This constructor method reads the grid and stores it in a hash.  For
 #  the most part it uses the varible names from the fort.14 as the keys
@@ -92,6 +109,12 @@ sub new {
    my $class = shift;
    my $obj={};
    bless $obj, $class;
+
+}
+
+
+sub loadGrid{
+   my $Obj=shift;
 
    my $gridFileName=shift;
    $obj->{GRIDFILENAME}=$gridFileName;
@@ -910,6 +933,20 @@ sub pointInPoly {  # $x $y \@px \@py    note: polygon described by vectors px,py
    return $inPoly;
 
 }
+
+
+
+sub writeGrid {
+   my $obj=shift;
+   my $fileName=shift;
+
+
+
+
+}
+
+
+
 
 
 
