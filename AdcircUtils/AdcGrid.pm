@@ -114,7 +114,7 @@ sub new {
 
 
 sub loadGrid{
-   my $Obj=shift;
+   my $obj=shift;
 
    my $gridFileName=shift;
    $obj->{GRIDFILENAME}=$gridFileName;
