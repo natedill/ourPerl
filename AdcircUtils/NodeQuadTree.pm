@@ -1,4 +1,4 @@
-package PointQuadTree;
+package NodeQuadTree;
 
 # contains subroutines for building a quadtree out of an adcirc grid
 # and for writing the grid out as a kml superoverlay 
@@ -16,7 +16,7 @@ use GD;
 #
 # input is a hash e.g.
 #
-# $tree = pointQuadTree->new(
+# $tree = NodeQuadTree->new(
 
 #                        );
 #
@@ -246,7 +246,7 @@ sub writeKML{
 	mkdir("Files");
 	$obj->_writeKML(0,1,$descString);    # index, depth - for top layer
  
-        #$obj->_makeColorbar('title');
+        $obj->_makeColorbar('title');
 
 }
 

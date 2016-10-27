@@ -1,9 +1,32 @@
 # elementQuadTree.pm
-
-# Copyright (C) 2014, Nate Dill
 #
 # contains subroutines for building a quadtree out of an adcirc grid
 # and for writing the grid out as a kml superoverlay, and other stuff...
+
+####################################################################### 
+# Author: Nathan Dill, natedill@gmail.com
+#
+# Copyright (C) 2014-2016 Nathan Dill
+#
+# This program  is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 3 of the 
+# License, or (at your option) any later version. 
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software 
+# Foundation, Inc., 59 Temple Place - Suite 330,Boston, MA  02111-1307,
+# USA.
+#                                       
+#######################################################################
+
+
+
 
 package ElementQuadTree;
 
@@ -26,8 +49,8 @@ use Storable;
 #                                  -EAST =>$east
 #                                  -WEST =>$west
 #                                  -XNODE=>\@X   # references to the node position table arrays (x,y,z)
-#                                  -YNODE=>\@Y
-#                                  -ZNODE=>\@Z 
+#                                  -YNODE=>\@Y   # these are indexed by node number, so arrays should
+#                                  -ZNODE=>\@Z   # have some value at index zero (could be undef)
 #                                  -MAXELEMS=>$maxelems # maximum number of elements per tree node
 #                               #                              );
 #
@@ -75,6 +98,130 @@ sub new
       return $obj;
       
 }
+
+
+
+#####################################################################
+# sub new_from_adcGrid()
+#
+# this is the constructor.  It will create the elementQuadTree object 
+# from an $adcGrid object
+# it also then adds all the elements to the tree
+#
+# input is a hash e.g.
+#
+# $tree = elementQuadTree->new_from_adcGrid(
+#                                  -MAXELEMS=>$maxelems, # maximum number of elements per tree node
+#                                  -ADCGRID=>$adcGrid,  # and adcGrid objecvt
+#
+#                                  -NORTH=>$north,   # the region for the tree (optional)
+#                                  -SOUTH=>$south,
+#                                  -EAST =>$east,
+#                                  -WEST =>$west,
+#                               #                              );
+#
+#####################################################################
+sub new_from_adcGrid
+{
+      my $self = shift;
+      
+      my $class = ref($self) || $self;
+      
+      my $obj = bless {} => $class;
+      
+      my %args = @_;
+     
+      $obj->{MAXELEMS}= $args{-MAXELEMS};
+      my $adcGrid=$args{-ADCGRID};      
+      my $north;
+      my $south;
+      my $east;
+      my $west; 
+
+      # set bounds based on optional input argument or full region from adcGrid obj     
+      if (defined $args{-NORTH}){
+         $north=$args{-NORTH};
+      }else{
+         $north=$adcGrid->{MAX_Y};
+      }
+      if (defined $args{-SOUTH}){
+         $south=$args{-SOUTH};
+      }else{
+         $south=$adcGrid->{MIN_Y};
+      }
+      if (defined $args{-EAST}){
+         $east=$args{-EAST};
+      }else{
+         $east=$adcGrid->{MAX_X};
+      }
+      if (defined $args{-WEST}){
+         $west=$args{-WEST};
+      }else{
+         $west=$adcGrid->{MIN_X};
+      }
+
+      $obj->{N1}      = ''; # this is the connectivity table, getsbuilt as elements are added
+      $obj->{N2}      = ''; # binary strings of 32 bit integers
+      $obj->{N3}      = '';
+      $obj->{LASTINDEX}=0;  # used to store last index where a point was found
+      
+
+      $obj->{SETNAME}='';
+
+      # set data for top level (index = 0)
+      $obj->{REGION}   [0] = [$north, $south, $east, $west];
+      $obj->{PARENT}   [0] = undef;
+      $obj->{CHILDREN} [0] = [];
+      $obj->{NELEMS}   [0] = 0;
+      $obj->{ELEMIDS}  [0] = ''; # binary string of 32 bit integers
+      $obj->{ISFULL}   [0] = 0;
+      $obj->{DEMBLOCK} [0] = undef; # binary string of 8 bit itegers, color map index 
+      $obj->{T}[0]         =undef; # these (T,U,I) are used to store binary strings of the 
+      $obj->{U}[0]         =undef; # interplonalt values and element ids for pixels
+      $obj->{I}[0]         =undef; # T and U are floats, I is an integer.   only stored at the leaf node level. 
+
+      print "starting tree, region $north $south $east $west\n";
+
+      # load the xyz data
+      print "new_from_adcGrid: getting nodal positions from adcGrid\n";
+
+      my $xyz =  $adcGrid->{XYZ};
+      my $nn = $adcGrid->{NP};
+      my @X;
+      my @Y;
+      my @Z;  
+
+      foreach my $i (0..$nn) {
+          my $offset =  $i*24;
+          my $packed = substr($xyz,$offset,24);
+          my ($x,$y,$z)=unpack("d3",$packed);
+          push @X, $x;
+          push @Y, $y;
+          push @Z, $z;
+      }
+      $obj->{XNODE}   = \@X;         
+      $obj->{YNODE}   = \@Y;
+      $obj->{ZNODE}   = \@Z;
+      $obj->{ZDATA}   = \@Z;
+
+      # add all the elements to the tree
+      print "new_from_adcGrid: adding elements from adcGrid\n";
+      my $ne=$adcGrid->{NE};
+      foreach my $eid (1..$ne){
+         my ($n1, $n2, $n3)=unpack("l3", substr($adcGrid->{NM},$eid*12,12) );
+         $obj->addElement(
+                           -ID=>$eid,
+                           -N1=>$n1,
+                           -N2=>$n2,
+                           -N3=>$n3
+                          );
+      }
+
+      return $obj;
+      
+}
+
+
 
 #########################################################
 # sub addElement ()
@@ -324,7 +471,7 @@ sub _writeKMLPoly{
 
         
         if ($index ==0 ) {
-	        $kmlFile = "doc.kml";
+	        $kmlFile = "Elements_doc.kml";
         }else{  
 		$kmlFile = "poly_Files/poly$index.kml";}
          
@@ -400,7 +547,7 @@ sub _writeKMLPoly{
 
                     print FILE "     <Placemark>\n";
 		    print FILE "        <name></name>\n";
-		    print FILE "        <styleUrl>..\\doc.kml#blkStyle</styleUrl>\n";
+		    print FILE "        <styleUrl>..\\Elements_doc.kml#blkStyle</styleUrl>\n";
                     print FILE "        <description>\n";
 		    print FILE "         <p><b>$descString</b></p>\n";
 		    my $tmpstr=sprintf ("element %i\n nodes:  %i, %i, %i\n",$elem,$n1,$n2,$n3);
@@ -612,12 +759,14 @@ sub _interpPixels { # private method actualy does the work
 #######################################################
 # sub setDEMBLOCK(                  # public method
 #                    -SETNAME=>'belv',
-#                    -ZDATA=>\@ZDATA,
+#                    -ZDATA=>\@ZDATA,  # optional, uses mesh Z if not given
 #                    -CLIM1=>-10,
 #                    -CLIM2=>10,
-#                    -PALETTE=>'palette_file.txt'
-#                    -NUMCOLORS=>20     # number of colors to display in png files for overlays
-#                    -ALPHA=>$alpha  #transparency 0-127 opaque - transparent
+#                    -PALETTE=>'palette_file.txt',
+#                    -NUMCOLORS=>20,     # number of colors to display in png files for overlays
+#                    -ALPHA=>$alpha,  #transparency 0-127 opaque - transparent
+#                    -ADD_ADJUST=>0.0,    #optional value added to ZDATA after applying MULT_ADJUST
+#                    -MULT_ADJUST=>1.0,    #optional value multiplied by ZDATA 
 #                 ) 
 #   input is a hash
 #
@@ -631,17 +780,26 @@ sub setDEMBLOCK {
        my %args=@_;
        
       $obj->{SETNAME}=$args{-SETNAME} if defined ($args{-SETNAME}); # unique, short, whitespaceless, inentifyer for the dataset 
-      $obj->{ZDATA}=$args{-ZDATA}; # an array reference to data on nodes (e.g. maxele data)
+      if (defined $args{-ZDATA}){
+         $obj->{ZDATA}=$args{-ZDATA}; # an array reference to data on nodes (e.g. maxele data)
+      }else{
+         $obj->{ZDATA}=$obj->{ZNODE};
+      }
       $obj->{CLIM1}=$args{-CLIM1}; # lower limit for color
       $obj->{CLIM2}=$args{-CLIM2}; # upper imit for color
       $obj->{COLORMAP}=$args{-COLORMAP}; # an array ref to arrays for the color pallette
       my $CMAP = $obj->loadColormap($args{-PALETTE}); # loadColormap sets the colormap arrays
       $obj->{NUMCOLORS}=$args{-NUMCOLORS}; 
       $obj->{ALPHA}=$args{-ALPHA} if defined ($args{-ALPHA});
+      my $addAdjust=0;
+      my $multAdjust=1.0;
+     $addAdjust=$args{-ADD_ADJUST} if defined ($args{-ADD_ADJUST});
+     $multAdjust=$args{-MULT_ADJUST} if defined ($args{-MULT_ADJUST});
   #    print "settingDEMBLOCK";
       mkdir("$obj->{SETNAME}_Files"); 
-      $obj->_setDEMBLOCK(0,1);
+      $obj->_setDEMBLOCK(0,1,$addAdjust,$multAdjust);
       $obj->_bottomUp(0,1);
+ 
 
 }
 
@@ -650,7 +808,7 @@ sub setDEMBLOCK {
 #
 # ###########################################################
 sub _setDEMBLOCK { # private method actualy does the work
-      my ($obj,$index,$depth)=@_;
+      my ($obj,$index,$depth,$addAdjust,$multAdjust)=@_;
       
       # recurse down to the bottom of the tree and set DEMBLOCK based on interpolant values
       my @kids = @{$obj->{CHILDREN}[$index]};   
@@ -662,7 +820,7 @@ sub _setDEMBLOCK { # private method actualy does the work
 		   print "depth = $depth\n";
 		   #sleep;
 		  
-             $obj->_setDEMBLOCK($kid,$depth+1);
+             $obj->_setDEMBLOCK($kid,$depth+1,$addAdjust,$multAdjust);
 	  }
  print "returning _SETDEMBLOCK!!\n";
 	  return;
@@ -708,6 +866,7 @@ sub _setDEMBLOCK { # private method actualy does the work
              unless ($z[0] <= -99999 || $z[1] <= -99999 || $z[2] <= -99999) {
 
 	        my $c=&triInterp2($T[$offset],$U[$offset],\@z);
+                $c=$c*$multAdjust + $addAdjust;
                 $C= ($c-$obj->{CLIM1})/$dzdc+1;
                 $C=1 if $C<1; 
 	        $C=128 if $C>128;
@@ -839,7 +998,7 @@ sub _bottomUp {
 			 # $jpix++;
 			 $j=$j+2;
 		 }
-		 print "offset is $offset\n";
+		# print "offset is $offset\n";
 		 $obj->{DEMBLOCK} [$index] = $demBlock2;
 		 
 		 $obj->_makePNG($index,256,256);
@@ -1475,14 +1634,217 @@ sub _getZvalue {
 
 
 
+#######################################################
+# $findElement = $tree->findElement(            # public method
+#                    -XX=>$longitude,
+#                    -YY=>$latitude,
+#                 ) 
+#   returns the element number for the element 
+#   the point is in, undef if it is not in the grid
+# 
+##############################################
+sub findElement {
+	my $obj=shift;
+	my %args=@_;
+
+	my $xx=$args{-XX};
+	my $yy=$args{-YY};
+        $obj->{MYELE}=undef;      
+
+       	# try the last tree node first, before starting from the top of the tree
+        if ($obj->{LASTINDEX} > 0) {         
+            $obj->_findElement($obj->{LASTINDEX},1,$xx,$yy);
+	    return $obj->{MYELE} if defined $obj->{MYELE};
+        }
+
+	# start from the top if we didn't get it above
+        $obj->_findElement(0,1,$xx,$yy);  
+	return $obj->{MYELE};
+}
+
+sub _findElement {
+	my ($obj,$index,$depth,$xx,$yy)=@_;
+	# print "getting index $index\n";
+	my $inRegion=0;
+	my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
+        	
+ 
+	if ($yy <= $north) {    # check of lowest y is below north
+         if ($yy >= $south) {    # if highest y is above south
+          if ($xx >= $west)  {    # if highest x is right of west
+	   if ($xx <= $east)  {    # if lowest x is left of east
+ 		   $inRegion=1;
+		   #	 print "in Region\n";
+		   
+           }
+	  }
+	 }
+	}	
+
+        return unless ($inRegion);
+
+        my @kids = @{$obj->{CHILDREN}[$index]};   
+        if (@kids) {  #  this node has children, keep going
+          foreach my $kid (@kids) {
+              $obj->_findElement($kid,$depth+1,$xx,$yy);
+	  }
+	  return;
+        }else{   # here if its a leaf node do the interpolation
+	   # loop over elements
+           my $cnt=$obj->{NELEMS}[$index];
+          while ($cnt--) {
+             my $elem=vec($obj->{ELEMIDS}[$index],$cnt,32);
+
+             my $n1=vec($obj->{N1},$elem,32);
+             my $n2=vec($obj->{N2},$elem,32);
+             my $n3=vec($obj->{N3},$elem,32);
+
+             my @x = ($obj->{XNODE}[ $n1 ],
+                   $obj->{XNODE}[ $n2 ],
+                   $obj->{XNODE}[ $n3 ] );
+             my @y = ($obj->{YNODE}[ $n1 ],
+                   $obj->{YNODE}[ $n2 ],
+                   $obj->{YNODE}[ $n3 ] );
+
+             # check to see if this point in in the element
+	     my $inPoly = &locat_chk($xx, $yy, \@x, \@y);
+             if ($inPoly) { 
+	        $obj->{MYELE}=$elem;  	    
+                return;
+             }
+          }
+      } #end if kids
+
+}
+
+
+
+
+
+
+
+#######################################################
+# $findElements = $tree->findElements(            # public method
+#                    -XX=>$longitude,
+#                    -YY=>$latitude,
+#                    -RADIUS=>$radius   # search radius to look in
+#                 ) 
+#   returns the element number for the element 
+#   the point is in, undef if it is not in the grid
+# 
+##############################################
+sub findElements {
+	my $obj=shift;
+	my %args=@_;
+
+	my $xx=$args{-XX};
+	my $yy=$args{-YY};
+        my $radius=$args{-RADIUS};
+        $obj->{MYELES}=[];      
+
+
+	# start from the top if we didn't get it above
+        $obj->_findElements(0,1,$xx,$yy,$radius);  
+	return $obj->{MYELES};
+}
+
+sub _findElements {
+	my ($obj,$index,$depth,$xx,$yy,$radius)=@_;
+	# print "getting index $index\n";
+	my $inRegion=0;
+	my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
+        my $rsq=$radius*$radius;	
+        #check each corner to see if any are in the circle 
+        my @PX1=($west, $east, $east, $west);
+        my @PY1=($south, $south, $north, $north);
+        my @PX2=($xx-$radius, $xx+$radius, $xx+$radius, $xx-$radius);
+        my @PY2=($yy-$radius, $yy-$radius, $yy+$radius, $yy+$radius);
+
+        # check if the points of the search box are in the node
+        foreach my $n (0..3){
+           $inRegion=pointInPoly($PX2[$n],$PY2[$n],\@PX1,\@PY1);
+           last if ($inRegion);
+        }
+        # check if the node coorners are in the search box
+        unless ($inRegion){
+          foreach my $n (0..3){
+             $inRegion=pointInPoly($PX1[$n],$PY1[$n],\@PX2,\@PY2);
+             last if ($inRegion);
+          }
+        }   
+        return unless ($inRegion);
+
+
+        my @kids = @{$obj->{CHILDREN}[$index]};   
+        if (@kids) {  #  this node has children, keep going
+          foreach my $kid (@kids) {
+              $obj->_findElements($kid,$depth+1,$xx,$yy,$radius);
+	  }
+	  return;
+        }else{   # here if its a leaf node do the interpolation
+	   # loop over elements
+           my $cnt=$obj->{NELEMS}[$index];
+          while ($cnt--) {
+             my $elem=vec($obj->{ELEMIDS}[$index],$cnt,32);
+
+             my $n1=vec($obj->{N1},$elem,32);
+             my $n2=vec($obj->{N2},$elem,32);
+             my $n3=vec($obj->{N3},$elem,32);
+             
+             #skip element if all nodes are outside the search box
+             next if ( ($obj->{XNODE}[$n1] < $xx - $radius) and
+                       ($obj->{XNODE}[$n2] < $xx - $radius) and
+                       ($obj->{XNODE}[$n3] < $xx - $radius) );
+
+             next if ( ($obj->{XNODE}[$n1] > $xx + $radius) and
+                       ($obj->{XNODE}[$n2] > $xx + $radius) and
+                       ($obj->{XNODE}[$n3] > $xx + $radius) );
+
+             next if ( ($obj->{YNODE}[$n1] < $yy - $radius) and
+                       ($obj->{YNODE}[$n2] < $yy - $radius) and
+                       ($obj->{YNODE}[$n3] < $yy - $radius) );
+
+             next if ( ($obj->{YNODE}[$n1] > $yy + $radius) and
+                       ($obj->{YNODE}[$n2] > $yy + $radius) and
+                       ($obj->{YNODE}[$n3] > $yy + $radius) );
+             
+
+             # check to see if any of the nodes are in the search radius
+             my $ds=($obj->{XNODE}[$n1]-$xx)**2.0 + ($obj->{YNODE}[$n1]-$yy)**2.0;
+             if ($ds <= $rsq){
+                 push @{$obj->{MYELES}},$elem; 
+                 next;
+             }
+             $ds=($obj->{XNODE}[$n2]-$xx)**2.0 + ($obj->{YNODE}[$n2]-$yy)**2.0;
+             if ($ds <= $rsq){
+                 push @{$obj->{MYELES}},$elem; 
+                 next;
+             }
+             $ds=($obj->{XNODE}[$n3]-$xx)**2.0 + ($obj->{YNODE}[$n3]-$yy)**2.0;
+             if ($ds <= $rsq){
+                 push @{$obj->{MYELES}},$elem; 
+                 next;
+             }
+          }
+      } #end if kids
+
+}
+
+
+
+
+
+
+
+
 
 #################################################################
-# sub _makeColorbar($title)
+# sub makeColorbar($title)
 #
 # this subroutine makes a png with the colorbar
 #
 #################################################################
-sub _makeColorbar {
+sub makeColorbar {
    my ($self,$title) = @_;
      
         my $numColors=13;  # the default	
