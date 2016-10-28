@@ -125,13 +125,13 @@ unless ($station) {
 
 unless ($beginDate) {
    die " no beginDate given\n" unless($interactive);
-   print "** No beginDate was specified (e.g. -begin 20070801)\n acceptable formats are: \n yyyyMMdd\n ";
+   print "** No beginDate was specified (e.g. -begin 20070801 00:00)\n acceptable formats are: \n yyyymmdd or yyymmdd HH:MM\n ";
    $beginDate=<>;
    chomp $beginDate;
 }
 unless ($endDate) {
    die " no endDate given\n" unless($interactive);
-   print "** No endDate was specified (e.g. -begin 20070801)\n acceptable formats are: \n yyyyMMdd\n ";
+   print "** No endDate was specified (e.g. -begin 20070801 01:00)\n acceptable formats are: \n yyyymmdd or yyyymmdd HH:MM\n ";
    $endDate=<>;
    chomp $endDate;
 }
