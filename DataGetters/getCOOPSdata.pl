@@ -131,7 +131,7 @@ unless ($beginDate) {
 }
 unless ($endDate) {
    die " no endDate given\n" unless($interactive);
-   print "** No endDate was specified (e.g. -begin 20070801 01:00)\n acceptable formats are: \n yyyymmdd or yyyymmdd HH:MM\n ";
+   print "** No endDate was specified (e.g. -end 20070801 01:00)\n acceptable formats are: \n yyyymmdd or yyyymmdd HH:MM\n ";
    $endDate=<>;
    chomp $endDate;
 }
