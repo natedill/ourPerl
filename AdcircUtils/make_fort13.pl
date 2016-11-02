@@ -87,13 +87,13 @@ use Mapping::MyMapping;
 use AdcircUtils::AdcGrid;
 use Geometry::PolyTools;
 
-
+#----------------------------------------------------------------------#
 # switches to select which nodal attributes you want in your fort.13
 # set to 1 (true) if you want them, zero (false) otherwise
 
 my $mannings_n_at_sea_floor = 1; 
 my $surface_canopy_coefficient = 1;
-my $surface_directional_effective_roughness_length = 0; 
+my $surface_directional_effective_roughness_length = 1; 
 my $surface_submergence_state = 1; 
 my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 1;
 my $primitive_weighting_in_continuity_equation = 1;
@@ -227,13 +227,29 @@ foreach my $key (keys %bbnns){
 # values will require larger run times. SkipCells > 1 will downsample the raster
 # and speed up the run time for large sectorRadius. 
 # 
-my $sectorRadius=1000;  # how far out to look in each direction (in meters) 
-my $sigma=250;  # controls gaussian radial distance based weights   
-my $skipCells=3;  # controls downsampling of the land cover data, 
-                  # skipCells=1 use all pixels, 2 use every other pixel, 3-every third...
+my $sectorRadius=5000;  # how far out to look in each direction (in meters) 
+my $sigma=2000;  # controls gaussian radial distance based weights  
 
-# note: this script can be a huge memory hog if you use a large sectorRadius
-#       it also runs much slower with large sectorRadius.
+# note: this script can be a huge memory hog and run very slowly if you use a 
+#    large sector radius.  The parameters below can help reduce the memory
+#    footprint and speed things up if you are in a hurry. 
+#
+#    skipCells - controls downsampling of the land cover data
+#               ideally set to 1, but increase to speed things up.
+#
+#    halfSectorAngle - sets the width of directional sectors data are drawn from.
+#               ideally this would be 15 for a 30 degree sector, but decreasing
+#               to narrower value can speed things up.
+#
+#    the script outputs a file called KernelSectors.txt, which shows contains
+#    a simpls ASCII representation of the directional sectors and pixels
+#    that data are drawn from. 
+#
+my $skipCells=2; # skipCells=1 use all pixels, 2 use every other pixel, 3-every third...
+my $halfSectorAngle=12; # a value less than 15 will narrow the search sectors
+
+
+
 
 #--------------------- surface_submergence_state -----------------------#
 # 
@@ -254,7 +270,7 @@ my @StartDry_kmlPolygons=('startdry_area1.kml'
 #
 my $default_ESLM = 40.0;  # the default value
 my $small_ESLM= 4.0;      # non-default value
-my $maxEleSize_ESLM=60;   # small elements get non-default
+my $maxEleSize_ESLM=60;   # smaller elements get non-default
 my $minDepth_ESLM = 3.0;  # deeper elements get non-default
 
 
@@ -483,6 +499,10 @@ $VCANOPY[23]= 1;   # Estuarine Aquatic Bed 0.030 0.040 1
 ##########################################
 # semi-hard settings for the projection
 #
+# as far as I know both ccap and nlcd
+# use Albers equal area conic GRS 80 
+#
+#
 my $pi=2.*atan2(1.0,0);
 my $deg2rad=$pi/180.0;
  # hard-coded projection data from prj file
@@ -513,9 +533,11 @@ $map->setAlbers(-PHI0=>$phi0,
 # Read Land Cover data 
 # read header
 
-my  ($ncols,$nrows,$dx,$xll,$yll,$yul,$xur,$cellSize,$binstring);
+my ($ncols,$nrows,$dx,$xll,$yll,$yul,$xur,$cellSize,$binstring);
 
-if ($mannings_n_at_sea_floor or $surface_canopy_coefficient or $surface_directional_effective_roughness_length){ # we need to read land cover data
+if ($mannings_n_at_sea_floor or 
+    $surface_canopy_coefficient or 
+    $surface_directional_effective_roughness_length){ # we need to read land cover data
 
    if ($flt_or_tif eq 'flt'){ # gridFloat format
       ($ncols,$nrows,$dx,$xll,$yll,$yul,$xur,$cellSize,$binstring)=&readGridFloat($hdrFile,$fltFile);
@@ -530,7 +552,7 @@ print "Done reading land cover data\n";
 
 ###################################################
 #
-# load the grid
+# load the ADCIRC grid
 #
 my $adcGrid=AdcGrid->new();
 $adcGrid->loadGrid($gridFile);
@@ -542,7 +564,6 @@ my ($xr,$yr,$zr)=$adcGrid->getNode(\@NIDS);
 my @X=@{$xr};
 my @Y=@{$yr};
 my @Z=@{$zr};
-
 
 
 #######################################################
@@ -592,19 +613,14 @@ foreach my $nid  (1..$np) {
            my $nVal=$bins{$bin};
            if ( ($z<$z1) and ($z>=$z2) ){
                 $man=$nVal; 
-                
-                print KIK "setting n for node $nid to $nVal, from poly $KMLNAMES[$k] $bin \n";
                 $poly_precedence=$bins{'precedence'};
                 last; # go with the first matching bin encountered
            }
-          
        }
        $k++;
        last unless ($man == 0); # go with the first poly that sets to something other than zero
    }
         
-
-   
    if ($man and $poly_precedence){   # we're setting it based on depth criteria and in polygon, no need to go further
       $OutLines[$nid]="$nid";
       $OutLines[$nid]=sprintf ("%s %7.4f",$OutLines[$nid],$man);
@@ -613,7 +629,6 @@ foreach my $nid  (1..$np) {
    }
 
    my $man_from_poly=$man;
- 
 
    $lam=$lam*$deg2rad;
    $phi=$phi*$deg2rad;
@@ -634,7 +649,6 @@ foreach my $nid  (1..$np) {
       push (@NotDefault,$nid);
       next;
    }
-
    
    # get the index values
    my $i0 = int (($x-$xll)/$dx);
@@ -648,16 +662,11 @@ foreach my $nid  (1..$np) {
 	   my $w=1;
 	   $w=5 if ($ii==0 and $jj==0);
            my $position=$ncols*$j0+$jj + $i0+$ii;
-           #my $ss=substr($binstring,$position*4,4);  
-          # my $ss=substr($binstring,$position,1); # now using 8-bit Char
-           #my $class=unpack('f<',$ss);  # no need to use a float for these data
-          # my $class=unpack('C',$ss);  # using 8-bit unsigned char now
            my $class=unpack('C',substr($binstring,$position,1));  # using 8-bit unsigned char now
            my $z0=$MANNING[$class];
            next unless (defined $z0);
            $z_tot=$z0*$w+$z_tot;
 	   $w_tot=$w_tot+$w;
- #print "class is $class\n";
            if ($ii == 0 and $jj == 0){
               $vc=$VCANOPY[$class] if (defined($VCANOPY[$class]));
            }
@@ -673,22 +682,15 @@ foreach my $nid  (1..$np) {
 
    push @VC, 0 if ($vc==0);
    push @VC_NDF, $nid if ($vc==0);
-  # print "pushing vc $vc, nid $nid\n" if ($vc==0);
- 
-
 
    next if ($zz == $ManningDefault);
 
    $OutLines[$nid]="$nid";
    $OutLines[$nid]=sprintf ("%s %7.4f",$OutLines[$nid],$zz);
-
-      #   print "$OutLines[$nid]\n";
-      #  }
    push (@NotDefault,$nid);
 
 }
 
-close(KIK);
 
 # add Mannings to the grid object
 print "setting Manning's N values\n";
@@ -726,9 +728,6 @@ if  ($surface_directional_effective_roughness_length){
 # i.e. sector based lists or i,j offsets from a central cell at 0,0
 #
 # set some data for the interpolation
-#my $sectorRadius=2500;  # how far out to look
-#my $sigma=750;
-#my $sigma2_sq=2*$sigma*$sigma;
 my $sigma2_sq=2*$sigma*$sigma;
 
 # note: this is the "from" wind direction. We are looking
@@ -737,18 +736,11 @@ my $sigma2_sq=2*$sigma*$sigma;
 # sectors follow anti-clociwise. angles are defined with
 # trigonometric convention (e.g. 0 points east, 90 points north)
 my @Azimuths=(-180,-150,-120,-90,-60,-30,0,30,60,90,120,150);
-my $halfSectorSize=15.0;
 
-#my @kernel_I;  # these are arrays of references to sector
-#my @kernel_J;  # based lists of indices relative to cell 0,0
-#my @kernel_R;  # contains refs to lists of radial distances 
-               # to above corresponding cell
-	       # these arrays have one ref for each sector
 my %kernel;
-$kernel{I}={};  # try using a hasi instead
-$kernel{J}={};
-$kernel{R}={};
-
+$kernel{I}={};  # kernel is a hash of sector based lists of indices
+$kernel{J}={};  # (0,0 indexed), that contain relative i,j offsets 
+$kernel{R}={};  # to cells found within sectorRadius of a given cell
 
 # figure out how far we have to go
 my $maxS= int($sectorRadius/$cellSize);
@@ -757,7 +749,6 @@ print "sectors will extend $maxS cells ($sectorRadius meters) from the center\n\
 
 $maxS++;
 
-
 my $i=-1*$maxS;
 while ($i<=$maxS){
       my $j=$maxS;
@@ -765,18 +756,14 @@ while ($i<=$maxS){
          my $r=$cellSize*($i**2.0+$j**2.0)**0.5;
          my $theta=atan2(-$j,$i);                         # $j is negative b/c positive direction is south
          # special treatment for the sector centered on -180
-         $theta=$theta-2*$pi if ( $theta > ((180-$halfSectorSize)*$deg2rad) ) ; 
+         $theta=$theta-2*$pi if ( $theta > ((180-$halfSectorAngle)*$deg2rad) ) ; 
 	 # find which sector we're in
 	 my $ia=0;
          foreach my $azimuth (@Azimuths) {
-             my $lowerA=$deg2rad*($azimuth-15.0);
-	     my $upperA=$deg2rad*($azimuth+15.0);
+             my $lowerA=$deg2rad*($azimuth-$halfSectorAngle);
+	     my $upperA=$deg2rad*($azimuth+$halfSectorAngle);
 	     if ($theta > $lowerA) {
                  if ($theta <= $upperA) {
-	       #      push (@{$kernel_I[$ia]},$i) if $r<=$sectorRadius;
-	       #      push (@{$kernel_J[$ia]},$j) if $r<=$sectorRadius;
-	       #      push (@{$kernel_R[$ia]},$r) if $r<=$sectorRadius;
-
                      push (@{$kernel{I}->{$azimuth}}, $i) if $r<=$sectorRadius;
                      push (@{$kernel{J}->{$azimuth}}, $j) if $r<=$sectorRadius;
                      push (@{$kernel{R}->{$azimuth}}, $r) if $r<=$sectorRadius;
@@ -793,45 +780,6 @@ while ($i<=$maxS){
       }
       $i=$i+$skipCells;
 }
-# output kernel sectors in  text file 
-# just as a check
-#my @letters=qw(A B C D E F G H I J K L);
-#my @letters=qw(0 1 2 3 4 5 6 7 8 9 A B);
-#my $ib=0;
-#my @out;    # intialize with blanks
-#$i=2*$maxS;
-#while ($i--){
-#   my $j=2*$maxS-1;
-#   while($j >= 0){
-#     $out[$i][$j]=" ";
-#     $j--;
-#   }
-#}
-#foreach my $letter (@letters) {
-#	my @Is=@{$kernel_I[$ib]};
-#	my @Js=@{$kernel_J[$ib]};
-#	my @Rs=@{$kernel_R[$ib]};
-#	my $ic=0;
-#	foreach my $is (@Is) {
-#	       $out[$is+$maxS][$maxS-$Js[$ic]]=$letter;
-#               $ic++;
-#        }
-#$ib++;
-#}
-
-#open OUTF, ">kernelSectors.txt";
-#my $j=2*$maxS;
-#while ($j--){
-#   my $i=0;
-#   while($i<2*$maxS){
-#      print OUTF "$out[$i][$j]";
-#      print "$out[$i][$j]";
-#      $i++;
-#   }
-#   print OUTF "\n";
-#   print "\n";
-#}
-close(OUTF);
 print "done building kernel\n\n";
 ######################################################
 
@@ -858,7 +806,7 @@ foreach my $letter (@letters) {
 	my @Rs=@{$kernel{R}->{$Azimuths[$ib]}};
 	my $ic=0;
 	foreach my  $is (@Is) {
-	       $out[$is+$maxS][$Js[$ic]+$maxS]=$letter;
+	       $out[$is+$maxS][$maxS-$Js[$ic]]=$letter;
                $ic++;
         }
 $ib++;
@@ -883,9 +831,6 @@ print "done building kernel\n\n";
 #######################################################
 # now read the grid and compute the surface directional 
 # roughness length node by node
-#my $adcGrid=AdcGrid->new($gridFile);
-#my $np=$adcGrid->getVar('NP');
-#print "NP $np \n";
 
 my @OutLines=();
 my @NotDefault=();
@@ -895,8 +840,7 @@ foreach my $nid  (1..$np) {
    $lam=$lam*$deg2rad;
    $phi=$phi*$deg2rad;
    my ($x, $y)=$map->albersForward (-PHI=>$phi, -LAM=>$lam);
-   #print "node: $nid, lamphi: $lam $phi, xy: $x $y\n"; 
-   print "node: $nid, \n"; 
+   print "computing directional z0 for node: $nid, \n"; 
    # skip this one if its outside the area
    if ( ($x > $xur-$sectorRadius) or
         ($x < $xll+$sectorRadius) or
@@ -910,49 +854,22 @@ foreach my $nid  (1..$np) {
         }
    }
 
-
    $OutLines[$nid]="$nid";
    
    # get the index values
    my $i0 = int (($x-$xll)/$dx);
    my $j0 = int (($yul-$y)/$dx);
-
-
    foreach my $azimuth (@Azimuths){	
-	   # my @Is=@{$kernel_I[$sector]};
-	   # my @Js=@{$kernel_J[$sector]};
-	   # my @Rs=@{$kernel_R[$sector]};
-	   #  my @Is=@{$kernel{I}->{$azimuth}};
-	   #  my @Js=@{$kernel{J}->{$azimuth}};
-	   #  my @Rs=@{$kernel{R}->{$azimuth}};
-      
       my $w_tot=0;
       my $z_tot=0;
 
       my $ic=0;
-      #foreach my $iis (@Is) {
-      #   my $js=$Js[$ic] + $j0;
-#	 my $is=$iis + $i0;
-#	 my $rs=$Rs[$ic];
-#         my $position=$ncols*$js + $is;
-#         my $ss=substr($binstring,$position*4,4); 
-#         my $class=unpack('f<',$ss);
-#         my $w = exp(-$rs**2.0/($sigma2_sq));
-#	 $w_tot=$w_tot + $w;
-#	 $z_tot=$z_tot + $Z0[$class]*$w;
-#         $ic++;
-#      }
       foreach my $iis (@{$kernel{I}->{$azimuth}}) {   # there's gotta be a way to speed this up 
          my $js=${$kernel{J}->{$azimuth}}[$ic]+ $j0;
 	 my $is=$iis + $i0;
-	 #my $rs=${$kernel{R}->{$azimuth}}[$ic];
 	 my $w=${$kernel{W}->{$azimuth}}[$ic];
          my $position=$ncols*$js + $is;
-         #my $ss=substr($binstring,$position,1); 
-         #my $class=unpack('f<',$ss);
          my $class=unpack('C',substr($binstring,$position,1));
-#print "is = $is, js = $js, class = $class, azimuth = $azimuth, w = $w\n";
-        # my $w = exp(-$rs**2.0/($sigma2_sq));
 	 my $z0=$Z0[$class];
 	 unless (defined $z0){   # we're in an area covered by the data set, witn no data
             $z0=0;   # don't include it in the average
@@ -970,8 +887,6 @@ foreach my $nid  (1..$np) {
       my $zz=0;
       $zz=$z_tot/$w_tot unless ($w_tot == 0);
       $OutLines[$nid]=sprintf ("%s %9.6f",$OutLines[$nid],$zz);
-
-      #   print "$OutLines[$nid]\n";
    }
    push (@NotDefault,$nid);
 }
@@ -979,7 +894,6 @@ foreach my $nid  (1..$np) {
 # add directional Z0 to the grid object
 my @defVal=(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.);
 $adcGrid->addNodalAttribute('surface_directional_effective_roughness_length','meter',12,\@defVal);
-
 
 foreach my $sector (1..12){
    my @VALS=();
@@ -994,7 +908,6 @@ foreach my $sector (1..12){
 }
 
 } # end if $surface_directional_effective_roughness_length
-
 
 #########################################################################
 # surface_submergence_state
@@ -1057,7 +970,6 @@ foreach $n (1..$np){
    }
    $DS[$n]=$ds;
 }
-# use default value of 40,   set it to 5 if deeper than 3 meters or min edge size is < 60
 
 my @EDDY=();
 my @EDDY_NIDS=();
@@ -1129,9 +1041,15 @@ $adcGrid->writeFort13($fort13);
 
 
 
+####################################################
+#
+# subroutines below
 
-
-
+#############################################################
+# sub to compute distance in meters between two
+# points in geographic coordinates using CPP projection
+#
+############################################################# 
 sub cppdist { # lat lon lat0 lon0
  my $twoPiOver360=4*atan2(1,1)/360.;
  my $R=6378206.4;
@@ -1148,9 +1066,10 @@ sub cppdist { # lat lon lat0 lon0
 
 
 
-
+##############################################################
 # sub to read gridFloat
-
+#
+##############################################################
 sub readGridFloat{
    my ($hdrFile,$fltFile) = @_;
 
@@ -1205,7 +1124,11 @@ sub readGridFloat{
    return ($ncols,$nrows,$dx,$xll,$yll,$yul,$xur,$cellSize,$binstring);
 }
 
+
+#################################################################3
 # sub to read geoTIFF
+#
+##################################################################
 sub readGeoTiff {
    my $tifFile=shift;
    
