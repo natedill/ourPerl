@@ -91,10 +91,10 @@ use Geometry::PolyTools;
 # switches to select which nodal attributes you want in your fort.13
 # set to 1 (true) if you want them, zero (false) otherwise
 
-my $mannings_n_at_sea_floor = 0; 
-my $surface_canopy_coefficient = 0;
-my $surface_directional_effective_roughness_length = 1; 
-my $surface_submergence_state = 0; 
+my $mannings_n_at_sea_floor = 1; 
+my $surface_canopy_coefficient = 1;
+my $surface_directional_effective_roughness_length = 0; 
+my $surface_submergence_state = 1; 
 my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 1;
 my $primitive_weighting_in_continuity_equation = 1;
 my $elemental_slope_limiter = 1;
@@ -187,21 +187,27 @@ my %ManningsByDepthPolygons;
 # depth is the DP value in the fort.14, not the dynamic depth during a model run
 #
 #  create some polygon "bin" hashes for the different polygons
-my %BinsForArea1=('9999999999:2'  => 0.016,  # applies 0.016 to depth >= 2 meters 
-                  '2:0'          => 0.02,    # applies 0.02 to depth >= 0 and < 2 meters
-                  '0:-3'         => 0.03,    # applies 0.03 to depth >= 0 meters < -3 
-                  '-3:-999999999' => 0.1,
-                  'precedence'    => 1      );  # do take presedence over land cover
 
-my %BinsForArea2=('9999999999:-999999999'  => 0.035,     # use 0.035 for all values
-                   'precedence' => 0                 );  # don't take presedence over land cover
+my %BinsForArea1=('9999999999:-999999999'  => 0.035,     # use 0.035 for all values
+                   'precedence' => 1                 );  # do take presedence over land cover
+
+my %BinsForArea2=('9999999999:200'  => 0.01,  # applies 0.01 to depth >= 200 meters 
+                  '200:50'          => 0.013,    # applies 0.013 to depth >= 50 and < 200 meters
+                  '50:-3'         => 0.018,    # applies 0.18 to depth >= -3 meters < 50 
+                  '-3:-999999999' => 0.106,    # applies 0.106 to dapth < -3
+                  'precedence'    => 0      );  # dont take presedence over land cover
+
 
 
 
 %ManningsByDepthPolygons= ( 'mannings_area1.kml' => \%BinsForArea1,
                             'mannings_area2.kml' => \%BinsForArea2  );
 
-
+my $bnrf=$ManningsByDepthPolygons{'mannings_area2.kml'};
+my %bbnns=%{$bnrf};
+foreach my $key (keys %bbnns){
+   print "key $key val $bbnns{$key}\n";
+}
 
 # ------------------surface directional roughness length----------------#
 #
@@ -218,10 +224,13 @@ my %BinsForArea2=('9999999999:-999999999'  => 0.035,     # use 0.035 for all val
 # guidance for selecting these numbers, at some point beyond the sigma distance 
 # the weight gets pretty small, so it may not make sense to have a sectorRadius
 # that is more than a factor of 2 or 3 greater than sigma. larger sectorRadius
-# values will require larger run times. 
+# values will require larger run times. SkipCells > 1 will downsample the raster
+# and speed up the run time for large sectorRadius. 
 # 
 my $sectorRadius=1000;  # how far out to look in each direction (in meters) 
-my $sigma=500;  # controls gaussian radial distance based weights   
+my $sigma=250;  # controls gaussian radial distance based weights   
+my $skipCells=3;  # controls downsampling of the land cover data, 
+                  # skipCells=1 use all pixels, 2 use every other pixel, 3-every third...
 
 # note: this script can be a huge memory hog if you use a large sectorRadius
 #       it also runs much slower with large sectorRadius.
@@ -231,9 +240,10 @@ my $sigma=500;  # controls gaussian radial distance based weights
 # you can provide a list of kml polygon files that each contain one
 # polygon within which all nodes will be specified to startDry 
 
-my @StartDry_kmlPolygons=('startDryPoly1.kml',
-                          'startDryPoly2.kml',
-                          'startDryPoly3.kml' );
+my @StartDry_kmlPolygons=('startdry_area1.kml'
+                          ,'startdry_area2.kml'
+                         #,'startdry_area3.kml'
+                          );
 
 
 #------- average_horizontal_eddy_viscosity_in_sea_water_wrt_depth ------#
@@ -256,8 +266,6 @@ my $ESL_default=-0.16;
 my $geoidOffset=0.335;
 
 
-
-
 #------------------------------------------------------------------------#
 # semi-soft settings 
 # 
@@ -268,6 +276,12 @@ my $geoidOffset=0.335;
 # the values provide below seem to be pretty standard
 # based on the success of a number of FEMA studies
 # and large scale ADCIRC storm surge modeling efforts
+# 
+# note: You can undef a value (or comment it out) to have it apply defaults
+#       or not take precedence over a polygon set value. e.g. if you 
+#       are using ccap and want to use depth based mannings for an area
+#       of open water set $MANNING[21]=undef and apply the polygon or
+#       ultimate default value you want.
 # 
 #
 # copied nlcd values from mannings_n_finder_v10.f
@@ -542,12 +556,14 @@ if ($mannings_n_at_sea_floor){
 my @PXM;
 my @PYM;
 my @BIN_DATA;
+my @KMLNAMES;
 foreach my $kmlFile (keys (%ManningsByDepthPolygons)){
    print "getting Manning's n polygon from $kmlFile\n";
    my ($pxm,$pym)=PolyTools::readKmlPoly($kmlFile);
    push @PXM, $pxm;
    push @PYM, $pym;
    push @BIN_DATA, $ManningsByDepthPolygons{$kmlFile};
+   push @KMLNAMES, $kmlFile;
 }
 
 
@@ -560,22 +576,30 @@ foreach my $nid  (1..$np) {
    my ($lam,$phi,$z)=$adcGrid->getNode($nid);
    my $man=0;
    my $poly_precedence=0;
-  
+
+   my $k=0;
    foreach my $pxm (@PXM){
-       my $pym = shift @PYM; push @PYM, $pym;
+       my $pym = $PYM[$k];
        my $inpoly=PolyTools::pointInPoly($lam,$phi,$pxm,$pym);
-       next unless $inpoly;  # not in this polygon, go to the next one
-       my $binref=shift @BIN_DATA; push @BIN_DATA, $binref;
+       unless ($inpoly) {$k++; next;} ;  # not in this polygon, go to the next one
+       my $binref=$BIN_DATA[$k];
        my %bins=%{$binref};
        foreach my $bin (keys %bins){
-           my ($z1,$z2)=split(/:/,$bin);
+           if ($bin eq 'precedence'){
+               next;
+           }
+           my ($z1,$z2)=split(/\:/,$bin);
            my $nVal=$bins{$bin};
-           $man=$nVal if ( ($z<$z1) and ($z>=$z2) );
-           $poly_precedence=$bins{'precedence'};
-           print "setting Manning n for node $nid with z = $z to $nVal, from poly $bin\n";
-           last; # go with the first matching bin encountered
+           if ( ($z<$z1) and ($z>=$z2) ){
+                $man=$nVal; 
+                
+                print KIK "setting n for node $nid to $nVal, from poly $KMLNAMES[$k] $bin \n";
+                $poly_precedence=$bins{'precedence'};
+                last; # go with the first matching bin encountered
+           }
           
        }
+       $k++;
        last unless ($man == 0); # go with the first poly that sets to something other than zero
    }
         
@@ -585,7 +609,7 @@ foreach my $nid  (1..$np) {
       $OutLines[$nid]="$nid";
       $OutLines[$nid]=sprintf ("%s %7.4f",$OutLines[$nid],$man);
       push (@NotDefault,$nid);
-      next;
+      next; #$nid
    }
 
    my $man_from_poly=$man;
@@ -594,7 +618,7 @@ foreach my $nid  (1..$np) {
    $lam=$lam*$deg2rad;
    $phi=$phi*$deg2rad;
    my ($x, $y)=$map->albersForward (-PHI=>$phi, -LAM=>$lam);
-; 
+   
    # skip this one if its outside the area
    if ( ($x > $xur-$cellSize) or
         ($x < $xll+$cellSize) or 
@@ -624,9 +648,11 @@ foreach my $nid  (1..$np) {
 	   my $w=1;
 	   $w=5 if ($ii==0 and $jj==0);
            my $position=$ncols*$j0+$jj + $i0+$ii;
-           my $ss=substr($binstring,$position*4,4); 
+           #my $ss=substr($binstring,$position*4,4);  
+          # my $ss=substr($binstring,$position,1); # now using 8-bit Char
            #my $class=unpack('f<',$ss);  # no need to use a float for these data
-           my $class=unpack('C',$ss);  # using 8-bit unsigned char now
+          # my $class=unpack('C',$ss);  # using 8-bit unsigned char now
+           my $class=unpack('C',substr($binstring,$position,1));  # using 8-bit unsigned char now
            my $z0=$MANNING[$class];
            next unless (defined $z0);
            $z_tot=$z0*$w+$z_tot;
@@ -662,6 +688,7 @@ foreach my $nid  (1..$np) {
 
 }
 
+close(KIK);
 
 # add Mannings to the grid object
 print "setting Manning's N values\n";
@@ -762,9 +789,9 @@ while ($i<=$maxS){
              $ia++; 
          }
 
-         $j--;
+         $j=$j-$skipCells;
       }
-      $i++;
+      $i=$i+$skipCells;
 }
 # output kernel sectors in  text file 
 # just as a check
@@ -915,15 +942,15 @@ foreach my $nid  (1..$np) {
 #	 $z_tot=$z_tot + $Z0[$class]*$w;
 #         $ic++;
 #      }
-      foreach my $iis (@{$kernel{I}->{$azimuth}}) {
+      foreach my $iis (@{$kernel{I}->{$azimuth}}) {   # there's gotta be a way to speed this up 
          my $js=${$kernel{J}->{$azimuth}}[$ic]+ $j0;
 	 my $is=$iis + $i0;
 	 #my $rs=${$kernel{R}->{$azimuth}}[$ic];
 	 my $w=${$kernel{W}->{$azimuth}}[$ic];
          my $position=$ncols*$js + $is;
-         my $ss=substr($binstring,$position,1); 
+         #my $ss=substr($binstring,$position,1); 
          #my $class=unpack('f<',$ss);
-         my $class=unpack('C',$ss);
+         my $class=unpack('C',substr($binstring,$position,1));
 #print "is = $is, js = $js, class = $class, azimuth = $azimuth, w = $w\n";
         # my $w = exp(-$rs**2.0/($sigma2_sq));
 	 my $z0=$Z0[$class];
@@ -940,9 +967,8 @@ foreach my $nid  (1..$np) {
 	 $z_tot=$z_tot + $z0*$w;
          $ic++;
       }
-      next if ($w_tot == 0);  # will just be default if there is no data in the entire sector.
-      my $zz=$z_tot/$w_tot;
-      #$OutLines[$nid]="$OutLines[$nid]"." $zz";
+      my $zz=0;
+      $zz=$z_tot/$w_tot unless ($w_tot == 0);
       $OutLines[$nid]=sprintf ("%s %9.6f",$OutLines[$nid],$zz);
 
       #   print "$OutLines[$nid]\n";
@@ -976,10 +1002,10 @@ if ($surface_submergence_state){
 
 print "determining StartDry\n";
 
-my @PX;
-my @PY;
+my @PX=();
+my @PY=();
 foreach my $kmlFile (@StartDry_kmlPolygons){
-    my ($px,$py)=PolyTools::readKmlPoly('$kmlFile');
+    my ($px,$py)=PolyTools::readKmlPoly("$kmlFile");
     push @PX, $px;
     push @PY, $py;
 };
@@ -989,14 +1015,16 @@ my @StartDry=();
 my @StartDry_Nids=();
 
 foreach my $n (1..$np){
+   my $k=0;
    foreach my $px (@PX){
-        my $py = shift (@PY); push @PY, $py;
+        my $py=$PY[$k];
         my $inpoly=PolyTools::pointInPoly($X[$n],$Y[$n],$px,$py);
         if ($inpoly) {
             push @StartDry, 1;
             push @StartDry_Nids, $n;
             last;
         }
+        $k++;
    }  
 }
 my @defVal=0;
@@ -1371,13 +1399,13 @@ sub readGeoTiff {
     my $numKeys=shift @VALS;
     print "number of keys : $numKeys\n";
     print "#   , keyID, tagLoc, count, valueOffset\n";
-    foreach my $key (1..$numKeys){
-       my $d1=shift @VALS;
-       my $d2=shift @VALS;
-       my $d3=shift @VALS;
-       my $d4=shift @VALS;
-       print "key $key -- $d1, $d2, $d3, $d4\n";
-    }
+ #   foreach my $key (1..$numKeys){
+ #      my $d1=shift @VALS;
+ #      my $d2=shift @VALS;
+ #      my $d3=shift @VALS;
+ #      my $d4=shift @VALS;
+ #      print "key $key -- $d1, $d2, $d3, $d4\n";
+ #   }
 
    open OUT, ">xyzclass.dump" or die "cant open xyacump";
    my $binstring='';
@@ -1388,11 +1416,7 @@ sub readGeoTiff {
       my $jj=0;
 
       foreach my $row (1..$rowsPerStrip){
-         sysread(FILE, $buf, 4*$ncols);
-         #my @data=unpack("f$endian"."[$ncols]",$buf);  # this does not work (flt is a float, tiff from gdal_translate is a char)
-         #my @data=unpack("C"."[$ncols]",$buf);  # assuming its an 8 bit (char) value
-         #my $str=pack ("C"."[$ncols]",@data);  # there is really no need to unpack and pack again.
-         #$binstring=$binstring.$str;
+         sysread(FILE, $buf,$ncols);  # pixels are each 8-bits
          $binstring=$binstring.$buf;  # no need to reorder just concatenate row by row 8 bit values.
          my $i=0;
          my $n=$gy-($j*$dy);
