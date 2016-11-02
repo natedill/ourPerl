@@ -793,8 +793,9 @@ sub setNodalAttributeValue{
 sub writeFort13{
    my $obj=shift;
    my $fort13=shift;
-   
+
    open F13, ">$fort13" or die "cant open $fort13 for writing";
+   $obj->{AGRID_13}='fort.13 by AdcGrid.pm' unless (defined ($obj->{AGRID_13}));  
    print F13 "$obj->{AGRID_13} by AdcGrid.pm\n";
    print F13 " $obj->{NP}\n";
    print F13 "$obj->{NATTR}\n";
