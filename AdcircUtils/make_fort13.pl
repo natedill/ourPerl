@@ -220,8 +220,8 @@ my %BinsForArea2=('9999999999:-999999999'  => 0.035,     # use 0.035 for all val
 # that is more than a factor of 2 or 3 greater than sigma. larger sectorRadius
 # values will require larger run times. 
 # 
-my $sectorRadius=3000;  # how far out to look in each direction (in meters) 
-my $sigma=1500;  # controls gaussian radial distance based weights   
+my $sectorRadius=1000;  # how far out to look in each direction (in meters) 
+my $sigma=500;  # controls gaussian radial distance based weights   
 
 # note: this script can be a huge memory hog if you use a large sectorRadius
 #       it also runs much slower with large sectorRadius.
@@ -940,6 +940,7 @@ foreach my $nid  (1..$np) {
 	 $z_tot=$z_tot + $z0*$w;
          $ic++;
       }
+      next if ($w_tot == 0);  # will just be default if there is no data in the entire sector.
       my $zz=$z_tot/$w_tot;
       #$OutLines[$nid]="$OutLines[$nid]"." $zz";
       $OutLines[$nid]=sprintf ("%s %9.6f",$OutLines[$nid],$zz);
