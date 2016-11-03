@@ -197,7 +197,18 @@ $outFileName="$station"."_"."$product-$beginDate-$endDate"."."."$format" unless 
 $outFileName =~ s/://g;  # remove colons from time format since you cant use them in file names
 $outFileName =~ s/\s//g;  # remove spaces too
 
-open FILE, ">$outFileName" or die "can't open $outFileName\n";
+# write a logfile
+my $logFile=$outFileName;
+$logFile =~ s/\.$format/\.log/;
+open LOG, ">$logFile" or die "ERROR: getCOOPSdata.pl: cant open $logFile for write\n";
+print LOG "requesting data from CO-OPS API with the following FORM data:\n";
+foreach my $key (keys %form){
+   print LOG "$key :: $form{$key}\n";
+}
+close(LOG);
+
+
+open FILE, ">$outFileName" or die "ERROR: getCOOPSdata.pl: can't open $outFileName for write\n";
 
 my $bd=substr($beginDate,0,8);
 my $beginTime=$beginDate;  
