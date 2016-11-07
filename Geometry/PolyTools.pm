@@ -190,8 +190,25 @@ sub readKmlPolys {
 } # end readKMLPolys
 
 
+#######################################
+# reads a kml file and returns
+# ref to an array of placemarks
+#
 
+sub readKmlPlacemarks{
 
+  my $kmlfile=shift;
+  $/='</Placemark>';
+  my @PMs;
+  open KML, "<$kmlfile" or die "ERROR: PolyTools::readKmlPlacemarks:  cannot open $kmlfile\n";
+  while (<KML>){
+      chomp;
+      $_ =~ s/.*<Placemark>?//;
+      push @PMs, $_;
+  }
+  return \@PMs;
+}
+  
 
 
 
