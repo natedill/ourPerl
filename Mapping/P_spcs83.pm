@@ -152,8 +152,6 @@ sub geo2sp{
       $isarray=0;
    }
 
-
-
    # get zone constants
    my $AP = get_AP($zone);
    my @SPCC = get_SPCC($zone);
@@ -180,8 +178,30 @@ sub geo2sp{
           $jkk++;
 
       }
+   }elsif ($AP eq 'T'){
+      my ($CM,$FE,$OR,$SF,$FN)=@SPCC;
+      $CM=$CM/$RAD;
+      $OR=$OR/$RAD;
+      $SF=1-1/$SF;
+
+      $SF=1.0 if ($zone eq 'HI 5');
+
+      #get constants
+      my ($ESQ,$EPS,$R,$A,$B,$C,$U,$V,$W,$SO) = tconst2($ER,$RF,$SF,$OR);
+    
+      my $jkk=0;
+      foreach my $lon (@LON) {
+          my $lat=$LAT[$jkk];
+          my $FI=$lat/$RAD; 
+          my $LAM=$lon/$RAD;
+          my $KP;
+          my $CONV;
+          ($Y[$jkk],$X[$jkk],$CONV,$KP) = tmgrid2($FI,$LAM,$ER,$ESQ,$EPS,$CM,$FE,$FN,$SF,$SO,$R,$A,$B,$C,$U,$V,$W);
+          $jkk++;
+      }
 
    }else{
+  
      print "AP =  $AP not ready yet geo2sp\n";
      sleep(100); 
      die;
@@ -533,6 +553,131 @@ sub lamr1{
 
       return ($LON,$LAT,$CONV,$E,$KP);
 }
+
+
+
+
+sub tconst2{
+# C     SccsID = "@(#)tconst.for	1.2	01/28/02"
+# *********************************************************************
+#function [ESQ,EPS,R,A,B,C,U,V,W,SO] = tconst2(ER,RF,SF,OR)
+#       IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+# C
+# C***** TRANSVERSE MERCATOR PROJECTION
+# C      PRECOMPUTATION OF CONSTANTS
+# C***** Programmed by T. Vincenty, NGS, in July 1984.
+# C******************** SYMBOLS AND DEFINITIONS  **********************
+# C   ER is equatorial radius of the ellipsoid (= major semiaxis).
+# C   RF is reciprocal of flattening of the ellipsoid.
+# C   SF is scale factor of the central meridian.
+# C   OR is southernmost parallel of latitude (in radians) for which
+# C     the northing coordinate is zero at the central meridian.
+# C   R, A, B, C, U, V, W are ellipsoid constants used for computing
+# C     meridional distance from latitude and vice versa.
+# C   SO is meridional distance (multiplied by the scale factor) from
+# C     the equator to the southernmost parallel of latitude.
+# C******************************************************************
+# C
+   my ($ER,$RF,$SF,$OR)=@_;
+   my $F=1.0/$RF;
+   my $ESQ=($F+$F-$F**2);
+   my $EPS=$ESQ/(1.-$ESQ);
+   my $PR=(1.0-$F)*$ER;
+   my $EN=($ER-$PR)/($ER+$PR);
+   my $A=-1.5*$EN + (9./16.)*$EN**3;
+   my $B= 0.9375*$EN**2 - (15./32.)*$EN**4;
+   my $C=-(35./48.)*$EN**3;
+   my $U=1.5*$EN - (27./32.)*$EN**3;
+   my $V=1.3125*$EN**2 - (55./32.)*$EN**4;
+   my $W=(151./96.)*$EN**3;
+   my $R=$ER*(1.-$EN)*(1.-$EN**2)*(1.+2.25*$EN**2+(225./64.)*$EN**4);
+   my $OMO=$OR + $A*sin(2.*$OR) + $B*sin(4.*$OR) + $C*sin(6.*$OR);
+   my $SO=$SF*$R*$OMO;
+   return  ($ESQ,$EPS,$R,$A,$B,$C,$U,$V,$W,$SO);
+}
+
+
+
+
+sub tmgrid2{
+# C     SccsID = "@(#)tmgrid.for	1.2	01/28/02"
+#function [NORTH,EAST,CONV,KP] = tmgrid2(FI,LAM,ER,ESQ,EPS,CM,FE,FN,SF,SO,R,A,B,C,U,V,W)
+#
+#       IMPLICIT DOUBLE PRECISION(A-H,K-Z)
+# C
+# C*****  TRANSVERSE MERCATOR PROJECTION
+# C       CONVERSION OF GEODETIC COORDINATES TO GRID COORDINATES
+# C*****  Programmed by T. Vincenty, NGS, in July 1984.
+# C*****************  SYMBOLS AND DEFINITIONS *************************
+# C   Latitude positive north, longitude positive west.  All angles are
+# C     in radian measure.
+# C   N, E are northing and easting coordinates respectively.
+# C   LAT, LON are latitude and longitude respectively.
+# C   CONV is convergence.
+# C   KP is point scale factor.
+# C   ER is equatorial radius of the ellipsoid (= major semiaxis).
+# C   ESQ is the square of first eccentricity of the ellipsoid.
+# C   EPS is the square of second eccentricity of the ellipsoid.
+# C   CM is the central meridian of the projection zone.
+# C   FE is false easting value at the central meridian.
+# C   FN is "false northing" at the southernmost latitude, usually zero.
+# C   SF is scale factor at the central meridian.
+# C   SO is meridional distance (multiplied by the scale factor) from
+# C     the equator to the southernmost parallel of latitude for the zone.
+# C   R is the radius of the rectifying sphere (used for computing
+# C     meridional distance from latitude and vice versa).
+# C   A, B, C, U, V, W are other precomputed constants for determination
+# C     of meridional distance from latitude and vice versa.
+# C
+# C   The formula used in this subroutine gives geodetic accuracy within
+# C   zones of 7 degrees in east-west extent.  Within State transverse
+# C   Mercator projection zones, several minor terms of the equations
+# C   may be omitted (see a separate NGS publication).  If programmed
+# C   in full, the subroutine can be used for computations in surveys
+# C   extending over two zones.
+# C
+# C*********************************************************************
+   my ($FI,$LAM,$ER,$ESQ,$EPS,$CM,$FE,$FN,$SF,$SO,$R,$A,$B,$C,$U,$V,$W)=@_;
+
+   my $OM=$FI + $A*sin(2.*$FI) + $B*sin(4.*$FI) + $C*sin(6.*$FI);
+   my $S=$R*$OM*$SF;
+   my $SINFI=sin($FI);
+   my $COSFI=cos($FI);
+   my $TN=$SINFI/$COSFI;
+   my $TS=$TN**2;
+   my $ETS=$EPS*$COSFI**2;
+   my $L=($LAM-$CM)*$COSFI;
+   my $LS=$L*$L;
+   my $RN=$SF*$ER/sqrt(1.-$ESQ*$SINFI**2);
+# C
+   my $A2=$RN*$TN/2;
+   my $A4=(5.-$TS+$ETS*(9.+4.*$ETS))/12;
+   my $A6=(61.+$TS*($TS-58.)+$ETS*(270.-330.*$TS))/360;
+   my $A1=-$RN;
+   my $A3=(1.-$TS+$ETS)/6;
+   my $A5=(5.+$TS*($TS-18.)+$ETS*(14.-58.*$TS))/120;
+   my $A7=(61.-479.*$TS+179.*$TS**2-$TS**3)/5040;
+   my $NORTH=$S-$SO + $A2*$LS*(1.+$LS*($A4+$A6*$LS)) +$FN;
+   my $EAST=$FE + $A1*$L*(1.+ $LS*($A3+$LS*($A5+$A7*$LS)));
+# C
+# C*** CONVERGENCE
+   my $C1=-$TN;
+   my $C3=(1.+3.*$ETS+2.*$ETS**2)/3;
+   my $C5=(2.-$TS)/15;
+   my $CONV=$C1*$L*(1.+$LS*($C3+$C5*$LS));
+# C
+# C*** POINT SCALE FACTOR
+   my $F2=(1.+$ETS)/2;
+   my $F4=(5.-4.*$TS+$ETS*( 9.-24.*$TS))/12;
+   my $KP=$SF*(1.+$F2*$LS*(1.+$F4*$LS));
+# C
+   return ($NORTH,$EAST,$CONV,$KP);
+}
+
+
+
+
+
 
 
 
