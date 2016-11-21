@@ -6,9 +6,6 @@
 #
 # can be run interactively or with command line options
 #
-# right now it only gets data for whole days (i.e. dates must
-# be in yyyymmdd format without the HH:MM)
-# 
 # it overcomes the one month limitation of the CO-OPs API
 # by grabing data in month long chunks and appending them to he 
 # output. Thus it is good for getting long records (e.g. 30 years)
