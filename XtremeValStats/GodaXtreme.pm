@@ -147,7 +147,7 @@ sub reducedVariate{
    
    $log.="]\n";
 
-   print "!--------------------------!\nINFO: GodaXtreme::reducedVariate:\n$log\n";
+  # print "!--------------------------!\nINFO: GodaXtreme::reducedVariate:\n$log\n";
 
    return (\@Y,$log);
 }
@@ -307,7 +307,7 @@ sub extendedLeastSquares{
       }else{
            die "ERROR:  GodaXtreme.pm:  Bad distribution type for extendedLeastSquares\n";
       }
- print "w2 $w2\n";
+ #print "w2 $w2\n";
       $sumw2y2+=$y*$y*$w2;
       $sumw2y+=$y*$w2;
       $sumw2x+=$x*$w2;
@@ -317,8 +317,8 @@ sub extendedLeastSquares{
 
    }
    $meanx=$meanx/$N;
-print "meanx $meanx\n";  
-print "sumwt $sumw2\n";
+#print "meanx $meanx\n";  
+#print "sumwt $sumw2\n";
  
    # determine slope (a) and intercept (b)
    my $a = ($sumw2xy - ($sumw2x*$sumw2y)/$sumw2  ) / ( $sumw2y2 - ($sumw2y*$sumw2y/$sumw2 ) ); 
@@ -333,7 +333,7 @@ print "sumwt $sumw2\n";
        $ssResidue=$ssResidue+($x_-$X[$n-1])**2.0;
    }
    my $rsq=1-$ssResidue/$ssTotal;
-print "ss ex $ssTotal $ssResidue\n";	
+#print "ss ex $ssTotal $ssResidue\n";	
 
    return ($a,$b,$rsq);
 
@@ -753,7 +753,7 @@ sub WISoneLinePOT{
 ###############################################################
 # sub fitDistributions
 #
-# e.g.   GodaXtreme::fitDistributions(\@Ordered,[10, 50, 100, 500],$lambda,$nu,$logFile);
+# e.g.   GodaXtreme::fitDistributions(\@Ordered,[10, 50, 100, 500],$lambda,$nu,$logFile,$threshold);
 #
 #
 #
@@ -761,14 +761,17 @@ sub WISoneLinePOT{
 
 
 sub fitDistributions{
-    my ($oref,$rpRef,$lambda,$nu,$logFile)=@_;
+    my ($oref,$rpRef,$lambda,$nu,$logFile,$threshold)=@_;
     my @Ordered=@{$oref};
+    $threshold = $Ordered[$#Ordered] unless ( defined $threshold);
     my $N=$#Ordered+1;
     my @RP = @{$rpRef};     # return periods that you want values for
     open LOG, ">>$logFile" or die "ERROR:  GodaExtreme.pm:  fitDistributions:  cant open logfile $logFile for append\n";
 
     my @RSQ;
     my @MIR;
+    my @DOL;
+    my @REC;
     my @SLOPE;  #a
     my @INTERCEPT; #b
     my @RV;  # holds ref to arrays of return values
@@ -806,10 +809,27 @@ sub fitDistributions{
        my ($rv,$log3)=GodaXtreme::returnValue(\@RP,$a,$b,$distType,$k,$lambda);
        print LOG "$log3";
  
-       # MIR criteria
-       my $mir=&MIR_criteria($N,$nu,$distType,$k,$rsq);
-       
+       # MIR criteria and REC criteria
+       my ($mir,$rec_,$dr,$dr_95)=&MIR_REC_criteria($N,$nu,$distType,$k,$rsq);
+       my $rec='Keep';
+       $rec='Reject' unless ($rec_);
        push @MIR, $mir;
+       print LOG "   MIR:  MInimum Ration of residual correlation coefficient, MIR = $mir\n";
+       print LOG "   REC:  Residue of correlation Coefficient, dr = $dr, dr_95 = $dr_95\n";
+       print LOG "   REC:  Rejected\n" unless ($rec_);
+       print LOG "   REC:  Not Rejected\n" if ($rec_);
+       push @REC, $rec;
+
+       # DOL criteria
+       my ($keep,$xi,$xi5,$xi95)=&DOL_criteria($oref,$nu,$distType,$k);
+       my $keepOrReject='Keep';
+       $keepOrReject='Reject' unless ($keep);
+       print LOG "   DOL:  Dimensionless Deviation of Maximum, Xi = $xi\n";
+       print LOG "   DOL:  Confidence intevals: Xi_5 = $xi5, Xi_95 = $xi95\n";
+       print LOG "   DOL:  Rejected\n" unless ($keep);
+       print LOG "   DOL:  Not Rejected\n" if ($keep);
+       push @DOL, $keepOrReject;      
+       
 
 
        push @RSQ,$rsq;
@@ -818,17 +838,24 @@ sub fitDistributions{
        push @RV, $rv;
     }
 
-    print LOG "#-----------------------------------------------------------------------------------------------#\n";
-    print LOG "#------------------------------------  Results Summary  ----------------------------------------#\n";
+    print LOG "#-----------------------------------------------------------------------------------------------------------------------------#\n";
+    print LOG "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+    print LOG "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
+    print "#-----------------------------------------------------------------------------------------------------------------------------#\n";
+    print "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+    print "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
     # sort by best fit and write results
-    my @Sorted = sort {$RSQ[$b] <=> $RSQ[$a]} (0..$#RSQ);
+    my @Sorted = sort {$MIR[$a] <=> $MIR[$b]} (0..$#MIR);
     my $str='';
     foreach my $rp (@RP){
        $str.=sprintf("| %5d-yr ",$rp);
     } 
-    print LOG "#-----------|-------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-    print LOG "# Dist type |   k   |   r^2   |   MIR   |  Slope  | Intercept $str#\n";
-    print LOG "#-----------|-------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+    print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
+    print LOG "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
+    print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+    print "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
+    print "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
+    print "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
 
     foreach my $i (@Sorted){
          my @RV_=@{$RV[$i]};
@@ -836,32 +863,50 @@ sub fitDistributions{
          foreach my $rv (@RV_){
               $str.=sprintf("| %8.2f ",$rv);
          }
-          my $str2=sprintf("| %8s  | %5.2f | %7.3f | %7.3f | %7.3f | %7.3f   $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$SLOPE[$i],$INTERCEPT[$i]);
+          my $str2=sprintf("| %8s  | %5.2f | %7.3f | %7.3f | %7s | %7s | %7.3f | %7.3f   $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
          print LOG "$str2\n";
+         print "$str2\n";
 
     }
 
 
 
+
+
     close (LOG);
+    return (\@Ordered,\@DISTTYPE,\@K,\@RSQ,\@MIR,\@DOL,\@REC,\@SLOPE,\@INTERCEPT,\@RP,\@RV);
+    
 
 
 
 }# end fitDistributions
  
 ########################
-# sub MIR_criteria ()give delta_r_mean for MIR criteria eqn 13.38 (Table 13.5)
+# sub MIR_REC_criteria give delta_r_mean for MIR criteria eqn 13.38 (Table 13.5)
+#                      and r_95 for REC criteria Table 13.8 
+# section 13.2.3
 # e.g.
-#       ($mir)=&MIR_criteria($N,$nu,$distType,$k,$rsq);
+#       ($mir,$keep,$dr,$dr_95)=&MIR_criteria($N,$nu,$distType,$k,$rsq);
+#
+# identify best fitting distribution by
+# MInimum Ratio (MIR) of residual correlation coefficient
+#
+# best distribution will have smallest MIR
 #    
+# MIR accounts for the fact that samples from broader distributions
+# tend to have less correlation than samples from narrower 
+# distributions.  Thus it is better than just looking at 
+# RSQ
+#
 
-
-sub MIR_criteria{
+sub MIR_REC_criteria{
     my ($N,$nu,$distType,$k,$rsq)=@_;
+  
+   # coefficients from Table 13.5 for rMean
    my ($a,$b,$c) = (0,0,0);
     
    if (($distType =~ /GUMBEL/) or ($distType eq 'FT-I')){
-      $a = -2.364 + 0.54*$nu**(5/2);
+      $a = -2.364 + 0.54*$nu**(5/2);          
       $b = -0.2665 - 0.0457*$nu**(5/2);
       $c = -0.044;
  
@@ -869,12 +914,12 @@ sub MIR_criteria{
    }elsif (($distType =~ m/FRECHET/) or ($distType eq 'FT-II')){  
        if ($k == 2.5){
            $a = -2.47 + 0.015*$nu**(3/2);
-           $b = -0.153 - 0.0052*$nu**(5/2);
+           $b = -0.153 - 0.0052*$nu**(5/2);     
            $c = 0;
 
        }elsif ($k == 3.33){
            $a = -2.462 - 0.009*$nu**2;
-           $b = -0.1933 - 0.0037*$nu**(5/2);
+           $b = -0.1933 - 0.0037*$nu**(5/2);     
            $c = -0.007;
  
        }elsif ($k == 5.0){
@@ -917,7 +962,10 @@ sub MIR_criteria{
        }else{
           print "bad k value $distType, k = $k\n";
        }
-
+   }elsif ($distType =~ m/LOGNORMAL/){
+        $a= -2.153 + 0.059*$nu**2; 
+        $b= -0.2627 - 0.1716*$nu**(1/4); 
+        $c = -0.045;
 
    }else{
         die "ERROR:  GodaXtreme.pm:  Bad Dist type $distType for MIR\n";
@@ -925,9 +973,274 @@ sub MIR_criteria{
    
 
    my $rmean=exp( $a + $b* log($N) + $c*(log($N))**2);
-   my $MIR=(1-$rsq)/$rmean;
-   return ($MIR); 
+   my $MIR=(1-$rsq**0.5)/$rmean;
+
+   # determine r_95 Table 13.8 equation 13.42
+   if (($distType =~ /GUMBEL/) or ($distType eq 'FT-I')){
+      $a = -1.444;
+      $b = -0.2733-0.414*$nu**2.5;
+      $c = -0.045
+ 
+
+   }elsif (($distType =~ m/FRECHET/) or ($distType eq 'FT-II')){  
+       if ($k == 2.5){
+           $a = -1.122-0.037*$nu;
+           $b = -0.3298 + 0.0105*$nu**0.25;
+           $c = 0.016;
+
+       }elsif ($k == 3.33){
+           $a = -1.306-0.105*$nu**1.5;
+           $b = -0.3001 + 0.0404*$nu**0.5;
+           $c=0;
+ 
+       }elsif ($k == 5.0){
+           $a =-1.463-0.107*$nu**1.5;
+           $b= -0.2716 + 0.0517*$nu**0.25;
+           $c= -0.018;
+
+       }elsif ($k == 10.0){
+           $a = -1.490-0.073*$nu;
+           $b= -0.2299-0.0099*$nu**2.5;
+           $c= -0.034;
+
+       }else{
+          print "bad k value $distType, k = $k\n";
+       }
+
+
+  
+   }elsif ($distType =~ m/WEIBULL/){
+
+       if ($k == 0.75){
+           $a = -1.473-0.049*$nu**2;
+           $b= -0.2181 + 0.0505*$nu**2;
+           $c= -0.041;
+
+       }elsif ($k == 1.0){
+           $a=-1.433;
+           $b= -0.2679;
+           $c= -0.044;
+
+       }elsif ($k == 1.4){
+           $a=-1.312;
+           $b=-0.3356-0.0449*$nu;
+           $c= -0.045;
+
+       }elsif ($k == 2.0){
+           $a=-1.188 + 0.073*$nu**0.5;
+           $b=-0.4401-0.0846*$nu**1.5;
+           $c= -0.039;
+
+       }else{
+          print "bad k value $distType, k = $k\n";
+       }
+   }elsif ($distType =~ m/LOGNORMAL/){
+        $a= -1.362 + 0.360*$nu**0.5;
+        $b= -0.3439-0.2185*$nu**0.5;
+        $c= -0.035;
+
+   }else{
+        die "ERROR:  GodaXtreme.pm:  Bad Dist type $distType for MIR\n";
+   }
+   
+   my $dr_95=exp( $a + $b* log($N) + $c*(log($N))**2);
+   my $dr=1-$rsq**0.5;
+   my $keep=0;
+   $keep = 1 if $dr < $dr_95;
+
+   return ($MIR,$keep,$dr,$dr_95); 
 
 }
+
+
+###################################################################
+# sub DOL_criteria    section 13.2.4
+#
+#  reject distribution based on Deviation of outlier of maximum value
+#
+#  if E < E5 or E> E95 reject distribution
+#
+#  e.g.  my ($keep,$xi,$xi5,$xi95)=&DOL_criteria($oref,$nu,$distType,$k);
+#
+#
+
+
+sub DOL_criteria {
+   my ($oref,$nu,$distType,$k)=@_;
+   my ($a,$b,$c);
+   
+   my @Ordered=@{$oref};
+   my $N=$#Ordered+1;
+
+   #mean
+   my $meanX=0; # mean
+   foreach my $x (@Ordered){
+     $meanX+=$x;
+   }
+   $meanX=$meanX/$N;
+
+   #standard deviation
+   my $stdX=0;  
+   foreach my $x (@Ordered){
+      $stdX+=($x-$meanX)**2;
+   }   
+   $stdX=($stdX/$N)**0.5;
+   
+   # Dimensionless Deviation for max value
+   my $Xi=($Ordered[0]-$meanX)/$stdX;
+  
+
+   # 95%  Table 13.6
+   if (($distType =~ /GUMBEL/) or ($distType eq 'FT-I')){
+       $a= -0.579 + 0.468*$nu;  
+       $b= 1.496 - 0.227*$nu**2;
+       $c = -0.038;
+ 
+
+   }elsif (($distType =~ m/FRECHET/) or ($distType eq 'FT-II')){  
+       if ($k == 2.5){
+         $a= 4.653 - 1.076*$nu**0.5;
+         $b= -2.047 + 0.307*$nu**0.5;
+         $c= 0.635;
+
+       }elsif ($k == 3.33){
+         $a= 3.217 - 1.216*$nu**0.25;
+         $b= -0.903 + 0.294*$nu**0.25;
+         $c= 0.427;
+ 
+       }elsif ($k == 5.0){
+         $a= 0.599 - 0.038*$nu**2;
+         $b= 0.518 - 0.045*$nu**2;
+         $c= 0.210;
+
+       }elsif ($k == 10.0){
+         $a= -0.371 + 0.171*$nu**2;
+         $b= 1.283 - 0.133*$nu**2;
+         $c= 0.045;
+
+       }else{
+          print "bad k value $distType, k = $k\n";
+       }
+
+
+  
+   }elsif ($distType =~ m/WEIBULL/){
+
+       if ($k == 0.75){
+          $a= -0.256 - 0.632*$nu**2;
+          $b= 1.269 + 0.254*$nu**2;
+          $c= 0.037;
+
+       }elsif ($k == 1.0){
+          $a= -0.682;
+          $b= 1.600;
+          $c= -0.045;
+
+       }elsif ($k == 1.4){
+          $a= -0.548 + 0.452*$nu**0.5;
+          $b= 1.521 - 0.184*$nu;
+          $c= -0.065
+
+       }elsif ($k == 2.0){
+          $a= -0.322 + 0.641*$nu**0.5;
+          $b= 1.414 - 0.326*$nu;
+          $c= -0.069;
+
+       }else{
+          print "bad k value $distType, k = $k DOL95\n";
+       }
+   }elsif ($distType =~ m/LOGNORMAL/){
+        $a=0.178 + 0.740*$nu;
+        $b= 1.148 - 0.480*$nu**1.5;
+        $c= -0.035;
+
+   }else{
+        die "ERROR:  GodaXtreme.pm:  Bad Dist type $distType for DOL95\n";
+   }
+   
+
+  
+   my $Xi95=$a + $b*log($N) + $c*(log($N))**2;
+
+ # 5% Table 13.7
+   if (($distType =~ /GUMBEL/) or ($distType eq 'FT-I')){
+       $a= 0.257 + 0.133*$nu**2;
+       $b= 0.452 - 0.118*$nu**2;
+       $c= 0.032;
+ 
+
+   }elsif (($distType =~ m/FRECHET/) or ($distType eq 'FT-II')){  
+       if ($k == 2.5){
+         $a= 1.481 - 0.126*$nu**0.25;
+         $b= -0.331 - 0.031*$nu**2;
+         $c= 0.192;
+
+       }elsif ($k == 3.33){
+         $a= 1.025;
+         $b= -0.077 - 0.050*$nu**2;
+         $c= 0.143
+ 
+       }elsif ($k == 5.0){
+         $a= 0.700 + 0.060*$nu**2;
+         $b= 0.139 - 0.076*$nu**2;
+         $c= 0.100;
+
+       }elsif ($k == 10.0){
+         $a= 0.424 + 0.088*$nu**2;
+         $b= 0.329 - 0.094*$nu**2;
+         $c= 0.061;
+
+       }else{
+          print "bad k value $distType, k = $k\n";
+       }
+
+
+  
+   }elsif ($distType =~ m/WEIBULL/){
+
+       if ($k == 0.75){
+          $a= 0.534 - 0.162*$nu;
+          $b= 0.277 + 0.095*$nu;
+          $c= 0.065;
+
+       }elsif ($k == 1.0){
+          $a= 0.308;
+          $b= 0.423;
+          $c= 0.037;
+
+       }elsif ($k == 1.4){
+          $a= 0.192 + 0.126*$nu**1.5;
+          $b= 0.501 - 0.081*$nu**1.5;
+          $c= 0.018;
+
+       }elsif ($k == 2.0){
+          $a= 0.050 + 0.182*$nu**1.5;
+          $b= 0.592 - 0.139*$nu**1.5;
+          $c= 0;
+
+       }else{
+          print "bad k value $distType, k = $k DOL95\n";
+       }
+   }elsif ($distType =~ m/LOGNORMAL/){
+        $a= 0.042 + 0.270*$nu;
+        $b= 0.581 - 0.217*$nu**1.5;
+        $c= 0;
+
+   }else{
+        die "ERROR:  GodaXtreme.pm:  Bad Dist type $distType for DOL95\n";
+   }
+   
+
+  
+   my $Xi5=$a + $b*log($N) + $c*(log($N))**2;
+
+  my $keep=1;
+  $keep=0 if (($Xi < $Xi5) or ($Xi > $Xi95));
+
+  return ($keep,$Xi,$Xi5,$Xi95);
+
+
+}   
+    
 
 1;
