@@ -458,6 +458,16 @@ sub WISoneLinePOT{
     print LOG "#                                                                      #\n";
     print LOG "#----------------------------------------------------------------------#\n";
     print LOG "#                                                                      #\n";
+          #123456789012345678901234567890123456789012345678901234567890123456789012
+    print "\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#--------- Statistical Analysis of Extreme Wave Heights ---------------#\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  '  Reference:  Yoshimi Goda, 2010, "Random Seas and Design of Maritime ',"\n";
+    print  "              Structures\", 3rd edition. Chapter 13.                   \n";  
+    print  "#                                                                      #\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#                                                                      #\n";
      
     # ingest the oneline file 
     my @T;  
@@ -470,6 +480,8 @@ sub WISoneLinePOT{
     my $station;
     my $lat;
     my $lon;
+    my $minDir=$azimuth-$halfSectorWidth;
+    my $maxDir=$azimuth+$halfSectorWidth;
 
     while (<IN>){
        chomp;
@@ -485,7 +497,7 @@ sub WISoneLinePOT{
        $lat = $data[2];
        $lon = $data[3];
        if (defined $azimuth){
-          $hs=0 if (( $dir >= $azimuth-$halfSectorWidth) and ($dir <= $azimuth+$halfSectorWidth));
+          $hs=0 unless (( $dir >= $minDir) and ($dir <= $maxDir));
        }
        push @HS, $hs;
        push @DIR, $dir;
@@ -493,11 +505,15 @@ sub WISoneLinePOT{
     }
     close(IN);
    
-    print LOG "  Reading data from WIS \"one line\" file: $oneLine\n";
     print LOG "  INFO read from WIS one line file: $oneLine\n";
     print LOG "     WIS station:  $station\n";
     print LOG "     Latitude:     $lat\n";
     print LOG "     Longitude:    $lon\n";
+    print "  INFO read from WIS one line file: $oneLine\n";
+    print "     WIS station:  $station\n";
+    print "     Latitude:     $lat\n";
+    print "     Longitude:    $lon\n";
+  
  
     my $str=$T[0];
     $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
@@ -512,7 +528,11 @@ sub WISoneLinePOT{
     print LOG "#----------------------------------------------------------------------#\n";
     print LOG "#--------------------- Chronological peak data ------------------------#\n";
     print LOG "#                                                                      #\n";
-    print LOG "#--- Events with peak significant wave height exceeding $threshold meters ---#\n";
+    my $thres_=sprintf("%4.2f",$threshold);
+    my $minD_=sprintf("%3d",$minDir);
+    my $maxD_=sprintf("%3d",$maxDir);
+    print LOG "#--- Events with peak significant wave height exceeding $thres_ meters ---#\n";
+    print LOG "#---- and mean direction between $minD_ and $maxD_ degrees CW from North ----#\n" if defined $azimuth;
     print LOG "#                                                                      #\n";
     print LOG "   Peak,     Time      ,   Record , Duration,  Hsig,  Dir,   Tp  \n";     
    
@@ -536,7 +556,7 @@ sub WISoneLinePOT{
        my $peakHs=0;    my $peakT;
        my $peakHr;
        my $peakTp; my $peakDIR;
-       if ($hs > $threshold){      # up-crossing of threshold
+       if ($hs >= $threshold){      # up-crossing of threshold
           $peakHs=$hs;
           $peakT=$t;
           $peakHr=$hr;
@@ -565,9 +585,9 @@ sub WISoneLinePOT{
                  push @DIR_atPeak, $peakDIR;
                  my $duration=$downCross-$upCross;
                  push @Duration, $duration;
-                 push @PeakHours, $hr;
+                 push @PeakHours, $peakHr+1;
                  $peakCount++;
-                 $str=sprintf("   %4d, %13s,%10d, %8d,  %4.2f,  %3d,  %5.2f",$peakCount,$peakT,$hr,$duration,$peakHs,$peakDIR,$peakTp);
+                 $str=sprintf("   %4d, %13s,%10d, %8d,  %4.2f,  %3d,  %5.2f",$peakCount,$peakT,$peakHr,$duration,$peakHs,$peakDIR,$peakTp);
                  #print LOG "peak $peakCount, time $peakT, record $hr, duration $duration, Hs= $peakHs, dir=$peakDIR, Tp=$peakTp \n";
                  print LOG "$str\n";
                  last;
@@ -577,46 +597,91 @@ sub WISoneLinePOT{
                push @PEAKS, $peakHs;
                push @PeakTimes, $peakT;
                $peakCount++;
+
+               print "e!!!!!!!!nded before down crossing\n";
+               print LOG "e!!!!!!!!nded before down crossing\n";
               # print LOG "#-- peak $peakCount at time $peakT is $peakHs\n";
           }
        }
     }
 
     
+
     # check to see if we need to merge peaks
     if ($minEventDuration > 1){
       print LOG "#----------------------------------------------------------------------#\n";
       print LOG "Check if peaks are within minEventDuration $minEventDuration hours and should be merged\n";
       print LOG "#----------------------------------------------------------------------#\n";
-      my $peakHs=shift @PEAKS; 
-      my $peakT=shift @PeakTimes; 
-      $upCross=shift @UpCrosses; 
-      $downCross=shift @DownCrosses;
-      my $peakTp=shift @TP_atPeak; 
-      my $peakDIR=shift @DIR_atPeak; 
-      my $duration=shift @Duration; 
-      $hr=shift @PeakHours;  
-      my @NN=(0..$#PEAKS);
-      while (@NN){
-        my $dt_peaks=$PeakHours[0]-$hr;
-        if ($dt_peaks < $minEventDuration) {
-           $str=$peakT;
-           $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
-           my $t1 = "$1-$2-$3 $4:$5";
-           $str=$PeakTimes[0];
-           $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
-           my $t2 = "$1-$2-$3 $4:$5";
-           print LOG "*-- Merge Peaks $peakHs (at $t1) and $PEAKS[0] (at $t2)\n";
-           if ($PEAKS[0] > $peakHs){  # keep n+1, shift then push, keep first upcross
-             $peakHs=shift @PEAKS; 
-             $peakT=shift @PeakTimes; 
-             $upCross=shift @UpCrosses; 
-             $downCross=shift @DownCrosses;
-             $peakTp=shift @TP_atPeak; 
-             $peakDIR=shift @DIR_atPeak; 
-             $duration=shift @Duration; 
-             $hr=shift @PeakHours;  
-             shift @NN;
+
+      my $minT=-99999999;
+
+      my $iter=0;
+     
+      while ($minT < $minEventDuration){
+  
+        $iter++;
+        print LOG "Peak merging iteration: $iter\n";
+
+
+        my $peakHs=shift @PEAKS; 
+        my $peakT=shift @PeakTimes; 
+        my $upCross=shift @UpCrosses; 
+        my $downCross=shift @DownCrosses;
+        my $peakTp=shift @TP_atPeak; 
+        my $peakDIR=shift @DIR_atPeak; 
+        my $duration=shift @Duration; 
+        my $hr=shift @PeakHours;  
+        my @NN=(0..$#PEAKS);
+        while (@NN){
+          my $dt_peaks=$PeakHours[0]-$hr;
+          if ($dt_peaks < $minEventDuration) {
+             $str=$peakT;
+             $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+             my $t1 = "$1-$2-$3 $4:$5";
+             $str=$PeakTimes[0];
+             $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+             my $t2 = "$1-$2-$3 $4:$5";
+             print LOG "*-- Merge Peaks iter: $iter, $peakHs (at $t1) and $PEAKS[0] (at $t2)\n";
+             if ($PEAKS[0] > $peakHs){  # keep n+1, shift then push, keep first upcross
+               $peakHs=shift @PEAKS; 
+               $peakT=shift @PeakTimes; 
+               $upCross=shift @UpCrosses; 
+               $downCross=shift @DownCrosses;
+               $peakTp=shift @TP_atPeak; 
+               $peakDIR=shift @DIR_atPeak; 
+               $duration=shift @Duration; 
+               $hr=shift @PeakHours;  
+               shift @NN;
+               push @PEAKS, $peakHs;
+               push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               push @DownCrosses, $downCross;
+               push @TP_atPeak, $peakTp;
+               push @DIR_atPeak, $peakDIR;
+               push @Duration, $duration;
+               push @PeakHours, $hr;
+               print LOG "    keeping Higher Later peak of $peakHs at hour $hr (at $t2)\n";
+             }else{ #keep n            push then shift
+               push @PEAKS, $peakHs;
+               push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               push @DownCrosses, $downCross;
+               push @TP_atPeak, $peakTp;
+               push @DIR_atPeak, $peakDIR;
+               push @Duration, $duration;
+               push @PeakHours, $hr;
+               print LOG "    keeping Higher Earlier peak of $peakHs at hour $hr (at $t1)\n";
+               $peakHs=shift @PEAKS; 
+               $peakT=shift @PeakTimes; 
+               $upCross=shift @UpCrosses; 
+               $downCross=shift @DownCrosses;
+               $peakTp=shift @TP_atPeak; 
+               $peakDIR=shift @DIR_atPeak; 
+               $duration=shift @Duration; 
+               $hr=shift @PeakHours;  
+               shift @NN;
+            }
+          }else{
              push @PEAKS, $peakHs;
              push @PeakTimes, $peakT;
              push @UpCrosses, $upCross;
@@ -625,55 +690,26 @@ sub WISoneLinePOT{
              push @DIR_atPeak, $peakDIR;
              push @Duration, $duration;
              push @PeakHours, $hr;
-             print LOG "    keeping Higher peak of $peakHs (at $t2)\n";
-           }else{ #keep n            push then shift
-             push @PEAKS, $peakHs;
-             push @PeakTimes, $peakT;
-             push @UpCrosses, $upCross;
-             push @DownCrosses, $downCross;
-             push @TP_atPeak, $peakTp;
-             push @DIR_atPeak, $peakDIR;
-             push @Duration, $duration;
-             push @PeakHours, $hr;
-             print LOG "    keeping Higher peak of $peakHs (at $t1)\n";
-             $peakHs=shift @PEAKS; 
-             $peakT=shift @PeakTimes; 
-             $upCross=shift @UpCrosses; 
-             $downCross=shift @DownCrosses;
-             $peakTp=shift @TP_atPeak; 
-             $peakDIR=shift @DIR_atPeak; 
-             $duration=shift @Duration; 
-             $hr=shift @PeakHours;  
-             shift @NN;
-          }
-        }else{
-           push @PEAKS, $peakHs;
-           push @PeakTimes, $peakT;
-           push @UpCrosses, $upCross;
-           push @DownCrosses, $downCross;
-           push @TP_atPeak, $peakTp;
-           push @DIR_atPeak, $peakDIR;
-           push @Duration, $duration;
-           push @PeakHours, $hr;
-        }
-        $peakHs=shift @PEAKS; 
-        $peakT=shift @PeakTimes; 
-        $upCross=shift @UpCrosses; 
-        $downCross=shift @DownCrosses;
-        $peakTp=shift @TP_atPeak; 
-        $peakDIR=shift @DIR_atPeak; 
-        $duration=shift @Duration; 
-        $hr=shift @PeakHours;  
-        shift @NN;
-      }
-      push @PEAKS, $peakHs;
-      push @PeakTimes, $peakT;
-      push @UpCrosses, $upCross;
-      push @DownCrosses, $downCross;
-      push @TP_atPeak, $peakTp;
-      push @DIR_atPeak, $peakDIR;
-      push @Duration, $duration;
-      push @PeakHours, $hr;
+          }  # not less than min duration
+          $peakHs=shift @PEAKS; 
+          $peakT=shift @PeakTimes; 
+          $upCross=shift @UpCrosses; 
+          $downCross=shift @DownCrosses;
+          $peakTp=shift @TP_atPeak; 
+          $peakDIR=shift @DIR_atPeak; 
+          $duration=shift @Duration; 
+          $hr=shift @PeakHours;  
+          shift @NN;
+        } #end NN loop
+      
+        $minT=9999999;       
+        foreach my $n (0..$#PEAKS-1){
+          my $dt=$PeakHours[$n+1]-$PeakHours[$n];
+          $minT=$dt if $dt < $minT;
+        } 
+        print LOG "Iteration: $iter, Minimum time between peaks is: $minT hours\n";
+
+      } #end iterative megring while loop
       
     }# end if checking need to merge peaks
 
@@ -688,8 +724,12 @@ sub WISoneLinePOT{
     foreach my $n (0..$npeaks-1){
        $minPeakDuration=$Duration[$n] if ($Duration[$n] < $minPeakDuration);
        $maxPeakDuration=$Duration[$n] if ($Duration[$n] > $maxPeakDuration);
+
        if ($n < $npeaks-1){
            my $dt=$PeakHours[$n+1]-$PeakHours[$n];
+           if ($dt < 0)  {
+           }
+ 
            $minTimeBetweenPeaks=$dt if $dt < $minTimeBetweenPeaks;
            
 
@@ -699,20 +739,41 @@ sub WISoneLinePOT{
     print LOG "#-------- Sanity Check on Peak Durations and Time Between Peaks--------#\n";
     print LOG "#----------------------------------------------------------------------#\n";
     print LOG "   Total Record Duration:  $totalDuration years\n";
-    print LOG "   Average Rate (lambda):  $lambda events/year\n";
     print LOG "   Using POT method with Threshold:  $threshold; $npeaks peaks were found\n";  
     if (defined $azimuth) {
         print LOG "  *--------------\n";
-        print LOG "  An Azimuth was defined. Only considering waves coming from $azimuth\n";
+        print LOG "   Only considering waves coming from $azimuth\n";
         print LOG "   degrees CW from North +- $halfSectorWidth degrees\n";
         print LOG "  *--------------\n";
     }
+    print LOG "   Average Rate (lambda):  $lambda events/year\n";
+    print LOG "   Peaks with less than $minEventDuration hours between are consider a single event and merged\n";
     my $minHrsBtwPeaks=$minTimeBetweenPeaks/$recsPerHour;
     print LOG "   Minimum Time Between Peaks:  $minHrsBtwPeaks hours\n";
     my $minDurHr=$minPeakDuration/$recsPerHour;
     print LOG "   Minimun Peak Duration: $minDurHr hours\n";
     my $maxDurHr=$maxPeakDuration/$recsPerHour;
     print LOG "   Maximum Peak Duration: $maxDurHr hours\n";
+
+    print "#----------------------------------------------------------------------#\n";
+    print "#-------- Sanity Check on Peak Durations and Time Between Peaks--------#\n";
+    print "#----------------------------------------------------------------------#\n";
+    print "   Total Record Duration:  $totalDuration years\n";
+    print  "   Using POT method with Threshold:  $threshold; $npeaks peaks were found\n";  
+    if (defined $azimuth) {
+        print  "  *--------------\n";
+        print  "  Only considering waves coming from $azimuth\n";
+        print  "   degrees CW from North +- $halfSectorWidth degrees\n";
+        print  "  *--------------\n";
+    }
+    print  "   Average Rate (lambda):  $lambda events/year\n";
+    print  "   Peaks with less than $minEventDuration hours between are consider a single event and merged\n";
+    print  "   Minimum Time Between Peaks:  $minHrsBtwPeaks hours\n";
+    print  "   Minimun Peak Duration: $minDurHr hours\n";
+    print  "   Maximum Peak Duration: $maxDurHr hours\n";
+
+
+
 
     # sort the data and write the orders statistics 
     my @sorted_i = sort {$PEAKS[$b] <=> $PEAKS[$a]} (0..$#PEAKS);
@@ -746,6 +807,8 @@ sub WISoneLinePOT{
     return (\@Ordered,$lambda,$logFile);
 
 } # end WISoneLinePOT
+
+
 
 
 
