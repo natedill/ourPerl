@@ -32,8 +32,10 @@ use strict;
 use Math::Trig;
 
 sub sp2geo{
-   my ($xref,$yref,$zone)=@_;
-   
+   my ($xref,$yref,$zone,$invertLon)=@_;
+ 
+   $invertLon=1 unless (defined $invertLon);   # use negative 1 to convert to degrees east after conversion
+
    my @X;
    my @Y;
    my @LON;
@@ -104,7 +106,7 @@ print "AP $AP, zone $zone, SPCC @SPCC\n";
            my $y=shift (@Y);
            my ($lat,$lon,$CONV,$KP) = tmgeod($y,$x,$EPS,$CM,$FE,$SF,$SO,$R,$V0,$V2,$V4,$V6,$FN,$ER,$ESQ);
            push @LAT, $lat*$RAD;
-           push @LON, $lon*$RAD;
+           push @LON, $invertLon*$lon*$RAD;
        }
 
 
@@ -126,7 +128,9 @@ print "AP $AP, zone $zone, SPCC @SPCC\n";
 
 # returns easting,northing in meters
 sub geo2sp{
-   my ($lonref,$latref,$zone)=@_;
+   my ($lonref,$latref,$zone,$invertLon)=@_;
+
+   $invertLon=1 unless (defined $invertLon);  # use negative 1 to convert to degrees west prior to conversion
 
    my @X;
    my @Y;
@@ -191,6 +195,7 @@ sub geo2sp{
     
       my $jkk=0;
       foreach my $lon (@LON) {
+          $lon=$lon*$invertLon;
           my $lat=$LAT[$jkk];
           my $FI=$lat/$RAD; 
           my $LAM=$lon/$RAD;
