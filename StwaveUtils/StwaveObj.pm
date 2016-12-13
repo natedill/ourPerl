@@ -18,7 +18,7 @@ package StwaveObj;
 ####################################################################### 
 # Author: Nathan Dill, natedill@gmail.com
 #
-# Copyright (C) 2016 Nathan Dill
+# Copyright (C) 2016 Nathan Dill, Ransom Consulting, Inc.
 #
 # This program  is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -1406,12 +1406,18 @@ sub getXy{
 # get the corners and return north,south,east,west bounds
 # and a polygon of the bounds
 #
-#  ($n,$e,$s,$w,$pxref,$pyref)=$stw->getBounds();
+#  ($n,$e,$s,$w,$pxref,$pyref)=$stw->getBounds(['kmlfilename');
+#
+#  if kmlfilename is provided it will write a simple
+#  kmlfile that draws the bounds of the stwave grid.
 #
 ##################################################################
 
 sub getBounds { 
     my $obj=shift;
+    my $kmlFile=shift;
+
+
     my $ni=$obj->{spatial_grid_parms}->{n_cell_i};
     my $nj=$obj->{spatial_grid_parms}->{n_cell_j};
     
@@ -1439,6 +1445,48 @@ sub getBounds {
     my @PX=($x1,$x2,$x3,$x4);
     my @PY=($y1,$y2,$y3,$y4);
 
+    if (defined ($kmlFile)){
+        open KML, ">$kmlFile";
+        
+        my $coordstr='';
+        foreach my $i (0..$#PX){
+            my  $point=sprintf("%0.14f,%0.14f,%0.5f",$PX[$i],$PY[$i],0);
+             $coordstr="$coordstr $point";
+        }
+
+        my $kmlStr='<Placemark>';
+        $kmlStr="$kmlStr\n"."   <name>stwave grid</name>";
+        $kmlStr="$kmlStr\n"."   <description>stwavegrid</description>";
+        $kmlStr="$kmlStr\n"."   <styleUrl>blueOutline}</styleUrl>";
+        $kmlStr="$kmlStr\n".'   <Polygon>';
+        $kmlStr="$kmlStr\n".'      <tessellate>1</tessellate>';
+        $kmlStr="$kmlStr\n".'       <outerBoundaryIs>';
+        $kmlStr="$kmlStr\n".'          <LinearRing>';
+        $kmlStr="$kmlStr\n".'             <coordinates>';
+        $kmlStr="$kmlStr\n"."                $coordstr";
+        $kmlStr="$kmlStr\n".'             </coordinates>';
+        $kmlStr="$kmlStr\n".'          </LinearRing>';
+        $kmlStr="$kmlStr\n".'       </outerBoundaryIs>';
+        $kmlStr="$kmlStr\n".'   </Polygon>';
+        $kmlStr="$kmlStr\n".'</Placemark>';
+        my $stylStr='<Style id="blueOutline">
+	<LineStyle>
+		<color>ff00ff55</color>
+		<width>3</width>
+	</LineStyle>
+	<PolyStyle>
+		<fill>0</fill>
+	</PolyStyle>
+        </Style>';
+        my $str='<?xml version="1.0" encoding="UTF-8"?>';
+        $str="$str\n".'<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">';
+        $str="$str\n".'<Document>';
+        $str="$str\n<name>name</name>";
+        my $endStr='</Document>'."\n".'</kml>';
+        print KML "$str"."$stylStr"."$kmlStr"."$endStr";
+        close (KML);
+    }
+        
 
     return($north,$east,$south,$west,\@PX,\@PY) ; # never eat shredded wheat!
      
