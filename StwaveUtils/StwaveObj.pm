@@ -176,7 +176,7 @@ sub loadSpatialData{
    if ( ($dataName eq 'surge') or  ($dataName eq 'wind') or ($dataName eq 'dep') or ($dataName eq 'fric') ){
       $namelist='input_files';
    }elsif ( ($dataName eq 'wave') or  ($dataName eq 'tp') or ($dataName eq 'break') or ($dataName eq 'rads') ){
-      $namelist='input_files';
+      $namelist='output_files';
    }else{
       die "ERROR: StwaveObj.pm: invalid data type $dataName given for loadSpatialData\n";
    }
@@ -1222,6 +1222,31 @@ sub getSpatialDataByIjRecField {
    return $val if (defined $val);
    return -99999;
 }
+
+
+#
+#########################################################################   
+# get spatial grid data by cell number and rec values
+#
+# e.g. $data = $stw->getSpatialDataByCellRecField("DEP",$cellNum,1,"Depth");
+#
+# returns a value from selected grid cell and record
+#########################################################################   
+sub getSpatialDataByCellRecField {
+   my $obj=shift;
+   my ($dataName,$cellNum,$rec,$fieldName)=@_;
+   $dataName=lc($dataName);
+   $fieldName=lc($fieldName);
+   my $ni=$obj->{$dataName}->{datadims}->{ni};
+   my $nj=$obj->{$dataName}->{datadims}->{nj};
+   $cellNum=$cellNum + $ni*$nj*($rec-1);
+  
+   my $val=$obj->{$dataName}->{$fieldName}[$cellNum];
+   return $val if (defined $val);
+   return -99999;
+}
+
+
 
 
 
