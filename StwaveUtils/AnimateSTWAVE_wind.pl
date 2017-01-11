@@ -209,7 +209,7 @@ foreach my $remoteDir (@REMOTEDIRS){
     # extract and write out time series
     my $minData=9999999999;
     my $maxData=-9999999999;
-    my $tsFile="$animationDir/$framesDir-$dataName-TS.csv";
+    my $tsFile="$animationDir/$framesDir-TS.csv";
     open TSF, ">$tsFile";  
     my $kk=0;
     my $xtsref=[];  #array refs to store time series for first point for later plotting
@@ -364,7 +364,7 @@ foreach my $remoteDir (@REMOTEDIRS){
     &makeColorbar("$framesDir/colorbar.png",$cbarTitle,$numColors,$cmap,$cll,$cul);
 
     # make the timeSpan file linking them all together, and zip it all up
-    my $kmzFile="$framesDir-$dataName".'.kmz';
+    my $kmzFile="$framesDir".'.kmz';
     my $kmldoc=$kmzFile;
     $kmldoc =~ s/kmz$/kml/;
     open KML, ">$kmldoc";
