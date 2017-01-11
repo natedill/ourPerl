@@ -249,22 +249,21 @@ foreach my $remoteDir (@REMOTEDIRS){
            $maxX=$t if $t > $maxX;
            foreach my $fld (0..$numCols){
                 my $ddd=$DATA[$fld][$rec];
-                if  (($fld==0) and ($kk==0)) {
+                print TSF ",$ddd";  # print without adjustment (should still be SI units)
+                if  ($fld==0)  {    # assume first field is magnitude or scalar of whatever variable and save min/max for color and plot limits
                    $ddd=$ddd*$multAdjust + $addAdjust;  # adjust data that are going on the ts plot
-                   push @{$ytsref},$ddd ;
-                   $minY=$ddd if $ddd < $minY ;
-                   $maxY=$ddd if $ddd > $maxY ;
-                }
-                print TSF ",$ddd";
-                if ($fld==0){  # assume first field is magnitude of whatever or a scalar and get min and max to set color limits
-                    my $ddd_=$ddd*$multAdjust+$addAdjust;
-                    $minData=$ddd_ if $ddd_ < $minData;
-                    $maxData=$ddd_ if $ddd_ > $maxData;
+                   $minData=$ddd if $ddd < $minY ; # this is min/max of whole png
+                   $maxData=$ddd if $ddd > $maxY ;
+                   if ($kk == 0){  # get min/max for the first station (for ts plot)
+                      push @{$ytsref},$ddd ;  # save time series for first station
+                      $minY=$ddd if $ddd < $minY;
+                      $maxY=$ddd if $ddd> $maxY;
+                   }  
                 }
            }
            print TSF "\n";
        }
-       $kk++; # counter to only save first record
+       $kk++; # counter to only save ts for first point (station) only
     }
     close TSF;      
 
