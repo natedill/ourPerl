@@ -114,7 +114,6 @@ sub newFromSim {
              print "$listName $key = $value\n";
           }
       }
-#sleep(1);
    }
    #$obj->_setOurs();
 
@@ -724,7 +723,8 @@ sub _readSpatialFile {
        my $fieldName=$obj->{$dataName}->{dataset}->{"fldname("."$field".")"};
        print "fldname $fieldName\n";
        $fieldName=lc($fieldName);
-       $obj->{$dataName}->{$fieldName}=[];
+       #binstring $obj->{$dataName}->{$fieldName}=[];
+       $obj->{$dataName}->{$fieldName}='';  # use binary string instead
        push @{$obj->{$dataName}->{fieldNames}},$fieldName;
    }
    
@@ -744,7 +744,8 @@ sub _readSpatialFile {
           my @data=split(/\s+/,$line);
           foreach my $field ( @{$obj->{$dataName}->{fieldNames}}){
              my $datum=shift(@data);
-             push (@{$obj->{$dataName}->{$field}},$datum);
+             #binstring push (@{$obj->{$dataName}->{$field}},$datum);
+             $obj->{$dataName}->{$field} .= pack("d",$datum);  # store as binary string of doubles (8 bytes each)
           }
        }
       
@@ -1115,7 +1116,11 @@ sub interpDepFromScatter{
     my $field='depth';
     $obj->{$dataName}->{fieldNames}=[];
     push $obj->{$dataName}->{fieldNames},$field;
-    $obj->{$dataName}->{$field}=\@DEP;
+    #binstring $obj->{$dataName}->{$field}=\@DEP;
+    foreach my $dep (@DEP){
+        $obj->{$dataName}->{$field} .= pack ("d",$dep);
+    }
+
    
 }
 
@@ -1188,8 +1193,11 @@ sub writeDepFile {
    my $numCells=$ni*$nj;
    foreach my $n (0..$numCells-1){
       foreach my $f (0..$#ALLFIELDS){
-         print DEP "$ALLFIELDS[$f][$n]\n";
+         my $datum=unpack ("d",substr($ALLFIELDS[$f],$n*8,8));
+         #binstring print DEP "$ALLFIELDS[$f][$n]\n";
+         print DEP "$datum";
       }
+      print DEP "\n";
    }
   
    close (SIM);
@@ -1218,7 +1226,8 @@ sub getSpatialDataByIjRecField {
    $fieldName=lc($fieldName);
   
 
-   my $val=$obj->{$dataName}->{$fieldName}[$cellNum];
+   #binstring my $val=$obj->{$dataName}->{$fieldName}[$cellNum];
+   my $val = unpack ("d",substr($obj->{$dataName}->{$fieldName},$cellNum*8,8));
    return $val if (defined $val);
    return -99999;
 }
@@ -1241,7 +1250,9 @@ sub getSpatialDataByCellRecField {
    my $nj=$obj->{$dataName}->{datadims}->{nj};
    $cellNum=$cellNum + $ni*$nj*($rec-1);
   
-   my $val=$obj->{$dataName}->{$fieldName}[$cellNum];
+   #binstring my $val=$obj->{$dataName}->{$fieldName}[$cellNum];
+
+   my $val = unpack ("d",substr($obj->{$dataName}->{$fieldName},$cellNum*8,8));
    return $val if (defined $val);
    return -99999;
 }
@@ -1302,7 +1313,8 @@ sub getSpatialDataByIjAllRecsAllFields {
       my @THISFIELD=();
       my $cellNum=($i-1)+$ni*($nj-$j);
       foreach my $rec (1..$numRecs){
-          push @THISFIELD,$obj->{$dataName}->{$fieldName}[$cellNum];
+          my $val = unpack ("d",substr($obj->{$dataName}->{$fieldName},$cellNum*8,8));
+          push @THISFIELD,$val;
           $cellNum=$cellNum + $ni*$nj;
       }
       push @DATA,\@THISFIELD;
