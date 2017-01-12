@@ -23,25 +23,26 @@ my $deg2rad=$pi/180.0;
 # config stuff
 
 my @REMOTEDIRS=('J:\NACCS_USACE_Data\Simulations\ET_HIS_Base',
-                'J:\NACCS_USACE_Data\Simulations\ET_HIS_NRL1',
+                'J:\NACCS_USACE_Data\Simulations\ET_HIS_NLR1',
                 'J:\NACCS_USACE_Data\Simulations\ET_HIS_NLR2',
                 'J:\NACCS_USACE_Data\Simulations\TP_SYN_Base',
                 'J:\NACCS_USACE_Data\Simulations\TP_SYN_NLR1',
                 'J:\NACCS_USACE_Data\Simulations\TP_SYN_NLR2');
 
-foreach my $remoteDir (@REMOTEDIRS){
 
  #my $remoteDir='D:\NACCS\tarballs';  # directory containing NACCS tarballs
 
  my $simFile='NAC2014_CME.sim';
  my $tarFileId='CME_SurgeWind';  # tar files matching this will be used
 
+# my $dataName='SURGE';            # STWAVE data name (e.g. Wind, Surge, Wave)
+# my $cbarTitle="Water Surface Elevation (ft-LMSL)";
  my $dataName='WIND';            # STWAVE data name (e.g. Wind, Surge, Wave)
  my $cbarTitle="Wind Speed (mph)";
 
  # adjustment for plotting (not applied to time series output)
  my $addAdjust=0;                # added to magnitude (first field) for adjustment after multiply adjust (e.g. datum adjustment)
- my $multAdjust= 3600/1600; #mps to mph            # multiplied by magnitude (first field) (e.g. for unit conversion)    
+ my $multAdjust= 3600/1609; #mps to mph            # multiplied by magnitude (first field) (e.g. for unit conversion)    
 
  #my $field='Surge';                # the field within the spatial data fille
  my $numColors=20;
@@ -148,6 +149,7 @@ foreach my $remoteDir (@REMOTEDIRS){
 
  #---------------------------------------------------------------
  # loop through the tar files in the remote dur
+foreach my $remoteDir (@REMOTEDIRS){
  opendir DH, $remoteDir;
  my @TARS=readdir(DH);
 
@@ -161,17 +163,22 @@ foreach my $remoteDir (@REMOTEDIRS){
     $framesDir =~ s/NACCS_//;
     $framesDir =~ s/_STWAVE//;
     $framesDir="$framesDir"."-$dataName";
-      
+
+    # dir to store results 
+    my $animationDir=$remoteDir;
+    $animationDir =~ s/J:\\NACCS_USACE_Data\\Simulations\\//;
+    mkdir $animationDir;   
+
+    # determine name for final kmz file output
+    my $kmzFile="$framesDir".'.kmz';
+    next if (-f "$animationDir/$kmzFile");  # skip this if we already made this one
+ 
     print "making framesDir $framesDir\n";
     mkdir $framesDir; 
 
     print "creating tar object\n";
     my $tar= Archive::Tar->new("$remoteDir/$remoteTarFile");
 
-    # dir to store results 
-    my $animationDir=$remoteDir;
-    $animationDir =~ s/J:\\NACCS_USACE_Data\\Simulations\\//;
-    mkdir $animationDir;   
 
 
     #list the files
@@ -364,7 +371,6 @@ foreach my $remoteDir (@REMOTEDIRS){
     &makeColorbar("$framesDir/colorbar.png",$cbarTitle,$numColors,$cmap,$cll,$cul);
 
     # make the timeSpan file linking them all together, and zip it all up
-    my $kmzFile="$framesDir".'.kmz';
     my $kmldoc=$kmzFile;
     $kmldoc =~ s/kmz$/kml/;
     open KML, ">$kmldoc";
