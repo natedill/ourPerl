@@ -725,6 +725,7 @@ sub _readSpatialFile {
        $fieldName=lc($fieldName);
        #binstring $obj->{$dataName}->{$fieldName}=[];
        $obj->{$dataName}->{$fieldName}='';  # use binary string instead
+       $obj->{$dataName}->{minmax}->{$fieldName}=[];   # store min and max of data
        push @{$obj->{$dataName}->{fieldNames}},$fieldName;
    }
    
@@ -746,13 +747,35 @@ sub _readSpatialFile {
              my $datum=shift(@data);
              #binstring push (@{$obj->{$dataName}->{$field}},$datum);
              $obj->{$dataName}->{$field} .= pack("d",$datum);  # store as binary string of doubles (8 bytes each)
+             if ($cell==1 and $rec==1){
+                 @{$obj->{$dataName}->{minmax}->{$field}}=($datum,$datum);
+             }else{
+                 unless (($datum < -99998) or ($datum > 99998)){
+                   $obj->{$dataName}->{minmax}->{$field}[0]=$datum if $datum < $obj->{$dataName}->{minmax}->{$field}[0];
+                   $obj->{$dataName}->{minmax}->{$field}[1]=$datum if $datum > $obj->{$dataName}->{minmax}->{$field}[1];
+                 }
+             }
           }
        }
-      
-
    }
     
    close(FILE);
+}
+
+
+
+############################################################
+# sub getMinMax
+#
+#  e.g.
+#
+#  my ($minHs,$maxHs)=$stw->getMinMax("WAVE","significant wave height");
+#
+#
+############################################################
+sub getMinMax{
+    my ($obj,$dataName,$field)=@_;
+    return  (@{$obj->{lc($dataName)}->{minmax}->{lc($field)}} );
 }
 
 
