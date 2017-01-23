@@ -57,7 +57,7 @@ my $beginDate;
 my $endDate;
 my $outFileName;
 my $url;
-my $baseStr1="http://www.wunderground.com/history/airport/";
+my $baseStr1="https://www.wunderground.com/history/airport/";
 my $baseStr2="/DailyHistory.html";
 my $data;
 my $req;
