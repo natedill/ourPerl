@@ -115,7 +115,7 @@ my $ua = LWP::UserAgent->new;
 $ua->cookie_jar($cookie_jar);
 
 # get the cookie we need to get the METARS
-my $url2='http://www.wunderground.com/cgi-bin/findweather/getForecast'; #?setpref=SHOWMETAR&value=0
+my $url2='https://www.wunderground.com/cgi-bin/findweather/getForecast'; #?setpref=SHOWMETAR&value=0
 $req = POST "$url2", [setpref=>'SHOWMETAR',value=>'1'];
 $res = $ua->request($req);  # response object
 
