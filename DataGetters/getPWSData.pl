@@ -54,7 +54,7 @@ my $beginDate;
 my $endDate;
 my $outFileName;
 my $url;
-my $baseStr1="http://www.wunderground.com/weatherstation/WXDailyHistory.asp?ID=";
+my $baseStr1="https://www.wunderground.com/weatherstation/WXDailyHistory.asp?ID=";
 my $baseStrDay="&day=";
 my $baseStrMonth="&month=";
 my $baseStrYear="&year=";
