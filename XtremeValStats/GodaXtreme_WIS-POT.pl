@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use lib 'c:\myPerl';
+use lib 'c:\ourPerl';
 use XtremeValStats::GodaXtreme;
 
 
