@@ -12,7 +12,7 @@ use Date::Pcalc;
 
 
 # my modules
-use lib 'c:\myPerl';
+use lib 'c:\ourPerl';
 use StwaveUtils::StwaveObj;
 use Mapping::UTMconvert;
 my $pi=atan2(0,-1);
