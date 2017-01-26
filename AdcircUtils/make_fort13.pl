@@ -81,7 +81,7 @@
 #######################################################################
 use strict;
 use warnings;
-use lib 'C:\myPerl'; # this may be different for you
+use lib 'C:\ourPerl'; # this may be different for you
 
 use Mapping::MyMapping;
 use AdcircUtils::AdcGrid;
