@@ -1400,9 +1400,11 @@ sub getSpatialDataByXyRecField {
 #
 ####################################################################
 sub getIj {  
+   
    my $obj=shift;
-   my ($x,$y)=@_;
-   my ($dontLimitToInsideDomain)=shift;
+   my ($x,$y,$dontLimitToInsideDomain)=@_;
+   $dontLimitToInsideDomain=0 unless defined ($dontLimitToInsideDomain);
+
    my $theta=$obj->{spatial_grid_parms}->{azimuth};
    my $x0=$obj->{spatial_grid_parms}->{x0};
    my $y0=$obj->{spatial_grid_parms}->{y0};
@@ -1424,7 +1426,6 @@ sub getIj {
       return (undef,undef) if (($i > $ni) or ($i < 1));
       return (undef,undef) if (($j > $nj) or ($j < 1));
    }
-
    return ($i,$j);
 }
 

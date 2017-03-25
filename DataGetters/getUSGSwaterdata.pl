@@ -43,11 +43,11 @@ my $interactive=1;  # set to 1 if you want the script to prompt for missing inpu
 
 
 # declare some variables
-my $site;       # ='07378500';  
-my $startDt;    # ='2016-08-10T00:00Z'; 
-my $endDt;      # ='2016-08-17T16:00Z';  
-my $format;      # ='rdb';    
-my $parameterCd; # ='00065';    
+my $site;        #  ='07378500';  
+my $startDt;     #  ='2016-08-10T00:00Z'; 
+my $endDt;       #  ='2016-08-17T16:00Z';  
+my $format;      #  ='rdb';    
+my $parameterCd; #  ='00065';    
 
 my $url = URI->new ('http://waterservices.usgs.gov/nwis/iv/');
 my $data;
