@@ -1433,7 +1433,9 @@ sub triInterp2 {  # $xp $yp \@x \@y
    #my $det=$yy2*$xx1 - $xx2*$yy1;
    #my $t=($xxp*$yy2 - $xx2*$yyp)/$det;
    #my $u=($xx1*$yyp - $yy1*$xxp)/$det;
-
+   foreach my $k (0..2){
+      return -99999 if ($z[$k] < -99998);
+   }
    return my $vp= $z[0] + $t*($z[1]-$z[0]) + $u*($z[2]-$z[0]);
 
 }
@@ -2121,7 +2123,7 @@ sub interp1 {
     foreach my $x (@X2) {
        
       # if its out of bounds return a NaN
-      if ($x<$X1[1]  or $x>$X1[$#X1] ) {
+      if ($x<$X1[0]  or $x>$X1[$#X1] ) {
           push (@Y2, 'NaN'); 
           next;
       }
@@ -2380,7 +2382,6 @@ sub interpValue{
    my @z = ($obj->{ZDATA}[ $n1 ],
              $obj->{ZDATA}[ $n2 ],
              $obj->{ZDATA}[ $n3 ] );
-
    
    my $zz=&triInterp2($t,$u,\@z);
    return $zz;
