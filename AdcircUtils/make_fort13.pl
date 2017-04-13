@@ -94,11 +94,11 @@ use Geometry::PolyTools;
 my $mannings_n_at_sea_floor = 1; 
 my $surface_canopy_coefficient = 1;
 my $surface_directional_effective_roughness_length = 1; 
-my $surface_submergence_state = 1; 
+my $surface_submergence_state = 0; 
 my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 1;
 my $primitive_weighting_in_continuity_equation = 1;
 my $elemental_slope_limiter = 1;
-my $sea_surface_height_above_geoid = 1;
+my $sea_surface_height_above_geoid = 0;
 
 #######################################################################
 #
@@ -157,7 +157,7 @@ my $prjFile=''; # not used at this point
 
 
 # --------------- Default Manning's ----------------------------------#
-my $ManningDefault=0.015;  # the ultimate default value
+my $ManningDefault=0.018;  # the ultimate default value
 
 
 # ------------ Depth based Manning's in specific polygons ------------#
@@ -188,7 +188,7 @@ my %ManningsByDepthPolygons;
 #
 #  create some polygon "bin" hashes for the different polygons
 
-my %BinsForArea1=('9999999999:-999999999'  => 0.035,     # use 0.035 for all values
+my %BinsForArea1=('9999999999:-999999999'  => 0.095959595,     # use constant for all values
                    'precedence' => 1                 );  # do take presedence over land cover
 
 my %BinsForArea2=('9999999999:200'  => 0.01,  # applies 0.01 to depth >= 200 meters 
@@ -200,14 +200,10 @@ my %BinsForArea2=('9999999999:200'  => 0.01,  # applies 0.01 to depth >= 200 met
 
 
 
-%ManningsByDepthPolygons= ( 'mannings_area1.kml' => \%BinsForArea1,
-                            'mannings_area2.kml' => \%BinsForArea2  );
+#%ManningsByDepthPolygons= ( );
+%ManningsByDepthPolygons= ( 'mannings_area1.kml' => \%BinsForArea1);
+#                            'mannings_area2.kml' => \%BinsForArea2  );
 
-my $bnrf=$ManningsByDepthPolygons{'mannings_area2.kml'};
-my %bbnns=%{$bnrf};
-foreach my $key (keys %bbnns){
-   print "key $key val $bbnns{$key}\n";
-}
 
 # ------------------surface directional roughness length----------------#
 #
@@ -246,7 +242,7 @@ my $sigma=2000;  # controls gaussian radial distance based weights
 #    that data are drawn from. 
 #
 my $skipCells=2; # skipCells=1 use all pixels, 2 use every other pixel, 3-every third...
-my $halfSectorAngle=12; # a value less than 15 will narrow the search sectors
+my $halfSectorAngle=15; # a value less than 15 will narrow the search sectors
 
 
 
@@ -256,10 +252,11 @@ my $halfSectorAngle=12; # a value less than 15 will narrow the search sectors
 # you can provide a list of kml polygon files that each contain one
 # polygon within which all nodes will be specified to startDry 
 
-my @StartDry_kmlPolygons=('startdry_area1.kml'
-                          ,'startdry_area2.kml'
+my @StartDry_kmlPolygons=();
+#my @StartDry_kmlPolygons=('startdry_area1.kml'
+#                          ,'startdry_area2.kml'
                          #,'startdry_area3.kml'
-                          );
+#                          );
 
 
 #------- average_horizontal_eddy_viscosity_in_sea_water_wrt_depth ------#
@@ -275,12 +272,17 @@ my $minDepth_ESLM = 3.0;  # deeper elements get non-default
 
 
 #---------------------- elemental_slope_limiter -------------------------#
-my $ESL_default=-0.16;
+my $ESL_default=-0.23;
 
 
 #------------------------sea_surface_height_above_geoid------------------#
-my $geoidOffset=0.335;
+my $geoidOffset=0.0;
 
+
+#---------------------- VCANOPY wind cutoff depth------------------------#
+my $windCutoffDepth=-1; # VCANOPY set to zero for DP < $windCutoffDepth
+                        # The idea it to prevent wind from blowing around
+                        # thin layers of water and causing instabilities.                         
 
 #------------------------------------------------------------------------#
 # semi-soft settings 
@@ -679,6 +681,9 @@ foreach my $nid  (1..$np) {
    }
 
    my $zz=$z_tot/$w_tot;
+
+   $vc=0 if ($z < $windCutoffDepth); 
+
 
    push @VC, 0 if ($vc==0);
    push @VC_NDF, $nid if ($vc==0);
