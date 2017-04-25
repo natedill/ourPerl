@@ -198,17 +198,70 @@ sub readKmlPolys {
 sub readKmlPlacemarks{
 
   my $kmlfile=shift;
-  $/='</Placemark>';
+  $/='</Placemark>';  # setting the record separator to the end placemark tag
   my @PMs;
   open KML, "<$kmlfile" or die "ERROR: PolyTools::readKmlPlacemarks:  cannot open $kmlfile\n";
   while (<KML>){
       chomp;
-      $_ =~ s/.*<Placemark>?//;
+      $_ =~ s/.*<Placemark>?//;   # remove the start placemark tag from the string
       push @PMs, $_;
   }
   return \@PMs;
 }
   
+
+
+
+
+
+
+#######################################
+# reads a kml file and returns
+# ref to an array of placemarks
+#
+
+sub readKmlPlacemarks_2{
+
+  my $kmlfile=shift;
+  $/='</Placemark>';  # setting the record separator to the end placemark tag
+  my @PMs;
+  open KML, "<$kmlfile" or die "ERROR: PolyTools::readKmlPlacemarks:  cannot open $kmlfile\n";
+  while (<KML>){
+      chomp;
+      $_ =~ s/.*<Placemark>?//s;   # remove the start placemark tag from the string
+      my $pmarkString=$_;
+
+      # extract coordinates
+      # remove the tags from the string
+      $_ =~ m/<coordinates>(.*)<\/coordinates>/s; 
+      my $coordString = $1;
+      $coordString =~ s/^\s+//s;
+      $coordString =~ s/\s+$//s;
+      my @data=split(/\s+/,$coordString);
+      my @px;
+      my @py;
+      foreach my $coord (@data) {
+         my ($x,$y,$z)=split(/,/,$coord);
+         push (@px,$x);
+         push (@py,$y);
+      }     
+
+      my %pm;
+      $pm{'pmarkstring'}=$pmarkString;
+      $pm{'coordinates'}=[\@px, \@py];
+
+      #extract description
+      $_ =~ m/<description>(.*)<\/description>/s; 
+      my $desc=$1;
+      $pm{'description'}=$desc;
+    
+
+
+      push @PMs, \%pm;
+  }
+  return \@PMs;
+}
+
 
 
 
