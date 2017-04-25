@@ -42,9 +42,9 @@
 #
 # The script goes through all the PE* directories and reads the grid
 # file to see if it has open boundaries. If the subdomain has an open 
-# boundary it writes a bunch of TPAR files in the PE directory and
-# inserts the appropriate commands into the fort.26 file in that PE
-# directory.  It assumes there is only one open boundary in each 
+# boundary it inserts the appropriate commands into the fort.26 file 
+# in that PE directory, and writes associated TPAR files in the run
+# root directory.  It assumes there is only one open boundary in each 
 # subdomain, and will die if it finds NOPE > 1 
 #
 # 
