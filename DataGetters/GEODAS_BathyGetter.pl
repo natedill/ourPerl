@@ -42,7 +42,8 @@ unless (defined $datasetList){
 my $prefix='NOS/coast/';
 
 # the url where the list of data set parent directories are held
-my $baseUrl="https://surveys.ngdc.noaa.gov/mgg/NOS/coast/";
+#my $baseUrl="https://surveys.ngdc.noaa.gov/mgg/NOS/coast/";
+my $baseUrl="https://data.ngdc.noaa.gov/platforms/ocean/nos/coast/";
 
 
 # loop through the datasets and download the data
