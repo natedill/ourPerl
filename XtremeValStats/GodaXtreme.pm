@@ -1304,6 +1304,56 @@ sub DOL_criteria {
 
 
 }   
-    
+   
+
+###############################################################
+# sub fitGumbel
+#
+# e.g.   GodaXtreme::fitGumbel(\@Ordered,[10, 50, 100, 500],$lambda,$nu);
+#
+#  $lambda - annual rate
+#  $nu - censoring parameter
+#
+#   @Ordered does not have to be sorted
+# 
+#    returns (\@RP,\@RV,$a,$b,$rsq,$mir,$rec_,$dol);
+sub fitGumbel{
+    my ($oref,$rpRef,$lambda,$nu)=@_;
+    my @Ordered=@{$oref};
+    # sort Ordered in case it is not already
+    my @sorted = sort {$b <=> $a} (@Ordered);
+    @Ordered=@sorted;
+    my $N=$#Ordered+1;
+    my @RP = @{$rpRef};     # return periods that you want values for
+    my @RV;  # holds ref to arrays of return values
+    my $k=0;
+    my $distType='GUMBEL';
+    # reduced variate
+    my ($yref,$log)=&reducedVariate(\@Ordered,$distType,$k,$nu);
+    my @Y=@{$yref};
+     
+    #  least squares fit
+    my ($a,$b,$rsq,$log2)=&leastSquares(\@Ordered,\@Y);
+
+    # return Values
+    my ($rv,$log3)=GodaXtreme::returnValue(\@RP,$a,$b,$distType,$k,$lambda);
+
+    # MIR criteria and REC criteria
+    my ($mir,$rec_,$dr,$dr_95)=&MIR_REC_criteria($N,$nu,$distType,$k,$rsq);
+    my $rec='Keep';
+    $rec='Reject' unless ($rec_);
+
+    my ($keep,$xi,$xi5,$xi95)=&DOL_criteria($oref,$nu,$distType,$k);
+    my $dol='Keep';
+    $dol='Reject' unless ($keep);
+   
+    return ($rv,$a,$b,$rsq,$mir,$rec_,$dol);
+}# end fitGumbel
+
+
+
+
+
+ 
 
 1;
