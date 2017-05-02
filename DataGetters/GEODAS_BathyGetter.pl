@@ -3,15 +3,11 @@
 #
 #  Get some Bathy data!
 #
+#  e.g. 
 #
-
-use strict;
-use warnings;
-use LWP::Simple ;
-use File::Path qw(make_path);
-use HTML::TableExtract;
-
-
+#  GEODAS_BathyGetter.pl --infile datasets.txt
+#
+#
 # a file produced by the geodas arcgis web map giving some summary data
 # for datasets found in a search area.
 #  http://maps.ngdc.noaa.gov/viewers/bathymetry/
@@ -26,15 +22,27 @@ use HTML::TableExtract;
 #
 ################################################################
 # my $datasetList='DigitalSoundingDataBathy.txt';
-print "Enter the name of dataset list file\n";
-my $datasetList=<>;
-chomp $datasetList;
+use strict;
+use warnings;
+use LWP::Simple ;
+use File::Path qw(make_path);
+use HTML::TableExtract;
+use Getopt::Long;
 
+my $datasetList;
+
+GetOptions ( 'infile:s' =>\$datasetList );
+
+unless (defined $datasetList){
+   print "Enter the name of dataset list file\n";
+   $datasetList=<>;
+   chomp $datasetList;
+}
 #print "Enter a directory where you want to mirror the GEODAS data\n";
 my $prefix='NOS/coast/';
 
 # the url where the list of data set parent directories are held
-my $baseUrl="http://surveys.ngdc.noaa.gov/mgg/NOS/coast/";
+my $baseUrl="https://surveys.ngdc.noaa.gov/mgg/NOS/coast/";
 
 
 # loop through the datasets and download the data
@@ -71,24 +79,6 @@ while (<FILE>){
        my $localPath1="$prefix"."$parentDir"."$id";
        print "localpath1 $localPath1\n";
        make_path($localPath1) unless (-d $localPath1);
-
-
-
-      # write out this portion of the summary file
-      
-      #my $sumfile="$localPath1/$id"."_summary.txt";
-      #print "sumfile $sumfile\n";
-      #open SUM, ">$sumfile";
-      #print SUM "$lastline\n";
-      #print SUM "$_\n";
-      #my $line=<FILE>;
-      #print SUM "$line";
-      #$line=<FILE>;
-       #print SUM "$line";
-      #$line=<FILE>;
-       #print SUM "$line";
-      #   close(SUM);
-
 
       # get the html directory listing of the directory for this dataset
       # and store it in a temporary file for parsing
