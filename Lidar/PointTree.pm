@@ -2571,7 +2571,7 @@ sub finalizeBin{
      my $obj=shift;
      my $superFinalized=shift;
      
-
+     $superFinalized="$obj->{FINALIZED}".'.sfn' unless (defined $superFinalized);
      $obj->{SFINALIZED}= $superFinalized;
 
      open IN,"< $obj->{FINALIZED}";
