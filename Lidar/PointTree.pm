@@ -2571,7 +2571,7 @@ sub finalizeBin{
      my $obj=shift;
      my $superFinalized=shift;
      
-     $superFinalized="$obj->{FINALIZED}".'.sfn' unless (defined $superFinalized);
+
      $obj->{SFINALIZED}= $superFinalized;
 
      open IN,"< $obj->{FINALIZED}";
@@ -2629,10 +2629,10 @@ sub finalizeBin{
 #
 # e.g.
 #
-# my ($xrf,$yrf,$zrf,$idrf)=$tree->getPoints($xx,$yy,$radius);
+# my ($xrf,$yrf,$zrf,$idrf,$dsqrf)=$tree->getPoints($xx,$yy,$radius);
 #
 # where $xrf... are references to arrays containing points found
-# and their ID value.#
+# and their ID value, and squared distance from xx,yy to the point.#
 #
 #####################################################################
 sub getPoints{
@@ -2646,6 +2646,7 @@ sub getPoints{
    my @Y=();
    my @Z=();
    my @S=();
+   my @DSQ=();
    
    my $rsq=$radius*$radius;
 
@@ -2689,10 +2690,11 @@ sub getPoints{
          push @Y, $yp;
          push @Z, $zp;
          push @S, $sp;
+         push @DSQ,$dsq;
       }
     }
     close(FH3);
-    return (\@X,\@Y,\@Z,\@S);
+    return (\@X,\@Y,\@Z,\@S,\@DSQ);
    
 
 }
