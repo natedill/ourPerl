@@ -398,7 +398,7 @@ sub printPoints {
 
 
         if (defined $args{-BINSTREAM}) {
-             $buf=pack('d3',$x,$y,$z);
+             $buf=pack('d3n',$x,$y,$z,$class);
              if ($outFH eq 'STDOUT') {
                 print STDOUT "$buf"
              }else{
