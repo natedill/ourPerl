@@ -829,7 +829,14 @@ sub fitDistributions{
     $threshold = $Ordered[$#Ordered] unless ( defined $threshold);
     my $N=$#Ordered+1;
     my @RP = @{$rpRef};     # return periods that you want values for
-    open LOG, ">>$logFile" or die "ERROR:  GodaExtreme.pm:  fitDistributions:  cant open logfile $logFile for append\n";
+    my $NOLOG=0;
+    if (defined $logFile){
+       $NOLOG=1 if (uc($logFile) eq 'NOLOG');
+    }else{
+       $NOLOG=1;  # in the case that no logfile is given
+    } 
+    
+    open LOG, ">>$logFile" or die "ERROR:  GodaExtreme.pm:  fitDistributions:  cant open logfile $logFile for append\n"  unless ($NOLOG);
 
     my @RSQ;
     my @MIR;
@@ -839,10 +846,11 @@ sub fitDistributions{
     my @INTERCEPT; #b
     my @RV;  # holds ref to arrays of return values
 
-
-    print LOG "#----------------------------------------------------------------------#\n";
-    print LOG "#---------------------- Fit Distributions ------- ---------------------#\n";
-    print LOG "#----------------------------------------------------------------------#\n";
+    unless ($NOLOG){
+      print LOG "#----------------------------------------------------------------------#\n"; 
+      print LOG "#---------------------- Fit Distributions ------- ---------------------#\n";
+      print LOG "#----------------------------------------------------------------------#\n";
+    }
 
     my @DISTTYPE=('GUMBEL',
                   'FRECHET','FRECHET','FRECHET','FRECHET',
@@ -858,39 +866,43 @@ sub fitDistributions{
 
        # reduced variate
        my ($yref,$log)=&reducedVariate(\@Ordered,$distType,$k,$nu);
-       print LOG "#------------------------ Fitting $distType -------------------------------#\n";
+       print LOG "#------------------------ Fitting $distType -------------------------------#\n"  unless ($NOLOG);
        my @Y=@{$yref};
      
-       print LOG "$log";
+       print LOG "$log" unless ($NOLOG);
        
 
        #  least squares fit
        my ($a,$b,$rsq,$log2)=&leastSquares(\@Ordered,\@Y);
-       print LOG "$log2";
+       print LOG "$log2"  unless ($NOLOG);
 
        # return Values
        my ($rv,$log3)=GodaXtreme::returnValue(\@RP,$a,$b,$distType,$k,$lambda);
-       print LOG "$log3";
+       print LOG "$log3" unless ($NOLOG);
  
        # MIR criteria and REC criteria
        my ($mir,$rec_,$dr,$dr_95)=&MIR_REC_criteria($N,$nu,$distType,$k,$rsq);
        my $rec='Keep';
        $rec='Reject' unless ($rec_);
        push @MIR, $mir;
-       print LOG "   MIR:  MInimum Ration of residual correlation coefficient, MIR = $mir\n";
-       print LOG "   REC:  Residue of correlation Coefficient, dr = $dr, dr_95 = $dr_95\n";
-       print LOG "   REC:  Rejected\n" unless ($rec_);
-       print LOG "   REC:  Not Rejected\n" if ($rec_);
+       unless ($NOLOG){
+         print LOG "   MIR:  MInimum Ration of residual correlation coefficient, MIR = $mir\n";
+         print LOG "   REC:  Residue of correlation Coefficient, dr = $dr, dr_95 = $dr_95\n";
+         print LOG "   REC:  Rejected\n" unless ($rec_);
+         print LOG "   REC:  Not Rejected\n" if ($rec_);
+       }
        push @REC, $rec;
 
        # DOL criteria
        my ($keep,$xi,$xi5,$xi95)=&DOL_criteria($oref,$nu,$distType,$k);
        my $keepOrReject='Keep';
        $keepOrReject='Reject' unless ($keep);
-       print LOG "   DOL:  Dimensionless Deviation of Maximum, Xi = $xi\n";
-       print LOG "   DOL:  Confidence intevals: Xi_5 = $xi5, Xi_95 = $xi95\n";
-       print LOG "   DOL:  Rejected\n" unless ($keep);
-       print LOG "   DOL:  Not Rejected\n" if ($keep);
+       unless ($NOLOG){
+         print LOG "   DOL:  Dimensionless Deviation of Maximum, Xi = $xi\n";
+         print LOG "   DOL:  Confidence intevals: Xi_5 = $xi5, Xi_95 = $xi95\n";
+         print LOG "   DOL:  Rejected\n" unless ($keep);
+         print LOG "   DOL:  Not Rejected\n" if ($keep);
+       }
        push @DOL, $keepOrReject;      
        
 
@@ -901,25 +913,28 @@ sub fitDistributions{
        push @RV, $rv;
     }
 
-    print LOG "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-    print LOG "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
-    print LOG "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
-    print "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-    print "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
-    print "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
+    unless ($NOLOG){
+      print LOG "#-----------------------------------------------------------------------------------------------------------------------------#\n";
+      print LOG "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print LOG "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
+      print "#-----------------------------------------------------------------------------------------------------------------------------#\n";
+      print "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
+    }
     # sort by best fit and write results
     my @Sorted = sort {$MIR[$a] <=> $MIR[$b]} (0..$#MIR);
     my $str='';
     foreach my $rp (@RP){
        $str.=sprintf("| %5d-yr ",$rp);
     } 
-    print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-    print LOG "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-    print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
-    print "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-    print "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-    print "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
-
+    unless ($NOLOG){
+      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
+      print LOG "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
+      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
+      print "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
+      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+    }
     foreach my $i (@Sorted){
          my @RV_=@{$RV[$i]};
          my $str='';
@@ -927,16 +942,38 @@ sub fitDistributions{
               $str.=sprintf("| %8.2f ",$rv);
          }
           my $str2=sprintf("| %8s  | %5.2f | %7.3f | %7.3f | %7s | %7s | %7.3f | %7.3f   $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
-         print LOG "$str2\n";
-         print "$str2\n";
+         print LOG "$str2\n" unless ($NOLOG);
+         print "$str2\n" unless ($NOLOG);
 
     }
 
+    # sort the fit parameters by MIR
+    @DISTTYPE=@DISTTYPE[@Sorted];
+    @K=@K[@Sorted];
+    @RSQ=@RSQ[@Sorted];
+    @MIR=@MIR[@Sorted];
+    @DOL=@DOL[@Sorted];
+    @REC=@REC[@Sorted];
+    @SLOPE=@SLOPE[@Sorted];
+    @INTERCEPT=@INTERCEPT[@Sorted];
+    @RV=@RV[@Sorted];
+   
+    # now cycle through them and shift/push the values until both DOL and REC are met
+    # the first set of parameters will be the one with the best fit
+    foreach my $i (0..$#K){
+       last if ($DOL[0] eq 'Keep' and $REC[0] eq 'Keep');
+       my $a=shift @DISTTYPE; push @DISTTYPE, $a;
+       $a=shift @K; push @K, $a;
+       $a=shift @RSQ; push @RSQ, $a;
+       $a=shift @MIR; push @MIR, $a;
+       $a=shift @DOL; push @DOL, $a;
+       $a=shift @REC; push @REC, $a;
+       $a=shift @SLOPE; push @SLOPE, $a;
+       $a=shift @INTERCEPT; push @INTERCEPT, $a;
+       $a=shift @RV; push @RV, $a;
+    }
 
-
-
-
-    close (LOG);
+    close (LOG)  unless ($NOLOG);
     return (\@Ordered,\@DISTTYPE,\@K,\@RSQ,\@MIR,\@DOL,\@REC,\@SLOPE,\@INTERCEPT,\@RP,\@RV);
     
 
