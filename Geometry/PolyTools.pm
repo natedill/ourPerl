@@ -254,6 +254,10 @@ sub readKmlPlacemarks_2{
       $_ =~ m/<description>(.*)<\/description>/s; 
       my $desc=$1;
       $pm{'description'}=$desc;
+
+      $_ =~ m/<name>(.*)<\/name>/s; 
+      my $name=$1;
+      $pm{'name'}=$name;
     
 
 
