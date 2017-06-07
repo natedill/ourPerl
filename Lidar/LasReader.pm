@@ -352,6 +352,11 @@ sub printPoints {
 	read(FILE, $buf, $recSize);
 	#data= (x,y,z,intensity,return bits,class,scan angle, usr data, point source id, GPStime(if format==1))
 	(@data)=unpack("l3 S b8 C c C S d",$buf);
+        unless (defined $data[1]) {
+            $nPoints--;
+            next;
+        }
+
         my $x=$xOff+$xScale*$data[0];
         my $y=$yOff+$yScale*$data[1];
         my $z=$zOff+$zScale*$data[2];
