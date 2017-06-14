@@ -1,4 +1,28 @@
 package Interp;
+# some subroutines for doing different types of interpolation
+#
+####################################################################### 
+# Author: Nathan Dill, natedill@gmail.com
+#
+# Copyright (C) 2016 Nathan Dill, Ransom Consulting, Inc.
+#
+# This program  is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 3 of the 
+# License, or (at your option) any later version. 
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software 
+# Foundation, Inc., 59 Temple Place - Suite 330,Boston, MA  02111-1307,
+# USA.
+#                                       
+#######################################################################
+
 
 use warnings;
 use strict;
@@ -96,8 +120,21 @@ sub interp1 {
 
 
 
-
-
+###########################################################
+# idw_np 
+#
+# compute inverse distance weighted average at point $xp,$yp
+# using set of points referenced by $Xref,$Yref,$Zref
+#
+# but only using the closest "npoints" points
+#
+# e.g.
+# 
+#  $zp = Interp::idw($xp,$yp,\@X,\@Y,\@Z,$power,$npoints)
+#
+#  $power is the power parameter for the weights
+#
+###########################################################
 
 sub idw_np {
 
@@ -167,7 +204,7 @@ sub minmax{
 #
 #  @PX and @PY must have at least 4 points 
 #  @PX must be increasing or you may have problems (e.g. divide by zero)
-#  @PY is a single values function of PX
+#  @PY is a single valued function of PX
 #
 #
 sub cspline{
@@ -192,7 +229,7 @@ sub cspline{
    # return undef if ($x > $PX[$#PX]) or ($x < $PX[0]);
    if ($x <= $PX[0]) {
        print "WARNING: Interp::cspline: x is outside PX interval\n";
-print "X = $x, PX interval $PX[0] to $PX[$#PX]\n";
+       print "X = $x, PX interval $PX[0] to $PX[$#PX]\n";
        my $m=($PY[1]-$PY[0])/($PX[1]-$PX[0]);
        my $y=$PY[0]-$m*($PX[0]-$x);
        return $y;
