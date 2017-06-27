@@ -341,9 +341,25 @@ sub printPoints {
       return if $zRng1 < $bottom;
    }
 
+   # determine the record size based onte point data record format
+   # $recSize=20+$format*8;
+   if ($format ==0){
+      $recSize=20;   # stock 20 bytes
+   }elsif ($format ==1){  
+      $recSize=28;   # 8 byte GPStime
+   }elsif ($format ==2){
+      $recSize=26; # adds r,g,b to zero, 2 bytes each
+   }elsif ($format ==3){
+      $recSize=34;  # adds 8byte GPStime (8bytes) and rgb (6 bytes)
+   }elsif ($format == 4){ 
+      $recSize= 57;  # adds wave packet to format 1
+   }elsif ($format==5){
+      $recSize=63;    #adds wave packet to format 3
+   }else{
+      die "lasReader can only handle point data record formats 0-6, we're not ready for format $format\n";
+   }
 
    # now start printing the points
-    $recSize=20+$format*8;
     seek(FILE, $off2Points,0);
    
 
@@ -352,11 +368,11 @@ sub printPoints {
 	read(FILE, $buf, $recSize);
 	#data= (x,y,z,intensity,return bits,class,scan angle, usr data, point source id, GPStime(if format==1))
 	(@data)=unpack("l3 S b8 C c C S d",$buf);
-        unless (defined $data[1] and defined $data[0] and defined $data[2] and defined $data[5]) {
-            $nPoints--;
-print "wtf data: @data\n";
-            last;
-        }
+#        unless (defined $data[1] and defined $data[0] and defined $data[2] and defined $data[5]) {
+#            $nPoints--;
+#            print "wtf data: @data\n";
+#            last;
+#        }
 
         my $x=$xOff+$xScale*$data[0];
         my $y=$yOff+$yScale*$data[1];
@@ -364,7 +380,11 @@ print "wtf data: @data\n";
 
 	my $class=$data[5];
         
-	# print "xyzclass: $x $y $z $class\n";
+	# print "x to small xyzclass: $x $y $z $class\n" if ($x > $xRng1);
+	# print "x to big xyzclass: $x $y $z $class\n" if ($x < $xRng2);
+	# print "y 2 sm xyzclass: $x $y $z $class\n" if ($y > $yRng1);
+	# print " y2 b xyzclass: $x $y $z $class\n" if ($y < $yRng2);
+
 	# print "data; @data\n";
 
 	# if the entire lidar box is not in the polygon or region
