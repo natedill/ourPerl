@@ -2701,4 +2701,94 @@ sub getPoints{
 
 
 
+#####################################################################
+#
+# sub getPoints_sorted
+#
+# after you have created the superfinlalized bin file, this method
+#
+# will return points within a circle defined by its center location
+# and radius
+#
+# e.g.
+#
+# my ($xrf,$yrf,$zrf,$idrf,$dsqrf)=$tree->getPoints($xx,$yy,$radius);
+#
+# where $xrf... are references to arrays containing points found
+# and their ID value, and squared distance from xx,yy to the point.#
+#
+# sorted by dsq, closest point first.
+#
+#####################################################################
+sub getPoints_sorted{
+   my $obj=shift;
+
+   my ($x,$y,$radius)=@_;
+#print " rrr $x, $y,$radius\n";
+
+   my @OFFSETS= @{$obj->{BEGINOFFSET}};
+   my @X=();
+   my @Y=();
+   my @Z=();
+   my @S=();
+   my @DSQ=();
+   
+   my $rsq=$radius*$radius;
+
+   # get a list of indices to search
+   my $iref=$obj->getIndicesInCircle($x,$y,$radius);
+   my @INDICES=@{$iref};
+   return \@INDICES unless (@INDICES);
+#print "incides @INDICES\n";
+#sleep(1);
+
+    # now get the points
+    open FH3, "<$obj->{SFINALIZED}" or die " cant open the superfinalized file, did you make it?";
+    binmode(FH3);
+
+   foreach my $leaf (@INDICES){
+   #    print "leaf is $leaf\n";
+      my $offset=$OFFSETS[$leaf];
+      my $buffer;
+      
+      # get the number of points and check the index
+      seek(FH3,$offset,0);
+      read(FH3,$buffer,8);
+      my ($chkIndex,$npoints)=unpack('L2',$buffer);
+      unless (defined $chkIndex){  # maybe incomplete file
+         print "undefined chkIndx at offset $offset\n";
+         next;     
+      }
+      unless ($chkIndex == $leaf){
+          print "whoa $chkIndex does not match file $leaf at offset $offset\n";
+          next;
+      }
+      foreach my $point (1..$npoints){
+         read(FH3,$buffer,26);
+         next unless ($buffer);
+         my ($xp,$yp,$zp,$sp)=unpack('d3n',$buffer);
+        
+         my $dsq=($xp-$x)**2 + ($yp-$y)**2;
+
+         next unless ($dsq <= $rsq);
+         push @X, $xp;
+         push @Y, $yp;
+         push @Z, $zp;
+         push @S, $sp;
+         push @DSQ,$dsq;
+      }
+    }
+    close(FH3);
+    # sort by ascending distance 
+    my @SortedI=sort { $DSQ[$a] <=> $DSQ[$b] } 0..$#DSQ;
+    @X=@X[@SortedI];
+    @Y=@Y[@SortedI];
+    @Z=@Z[@SortedI];
+    @S=@S[@SortedI];
+    @DSQ=@DSQ[@SortedI];
+    return (\@X,\@Y,\@Z,\@S,\@DSQ);
+}
+
+
+
 1;
