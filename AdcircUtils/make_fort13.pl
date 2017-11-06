@@ -99,6 +99,7 @@ my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 1;
 my $primitive_weighting_in_continuity_equation = 1;
 my $elemental_slope_limiter = 1;
 my $sea_surface_height_above_geoid = 0;
+my $advection_state = 1;
 
 #######################################################################
 #
@@ -258,6 +259,17 @@ my @StartDry_kmlPolygons=();
                          #,'startdry_area3.kml'
 #                          );
 
+
+#--------------------- advection_state -----------------------#
+# 
+# you can provide a list of kml polygon files that each contain one
+# polygon within which all nodes will be specified to turn NOLICA/NOLICAT off 
+
+my @AdvectionState_kmlPolygons=('Advection_off.kml');
+#my @AdvectionState_kmlPolygons=('advectionoff_area1.kml'
+#                          ,'advectionoff_area2.kml'
+                         #,'advectionoff_area3.kml'
+#                          );
 
 #------- average_horizontal_eddy_viscosity_in_sea_water_wrt_depth ------#
 #
@@ -951,6 +963,54 @@ $adcGrid->setNodalAttributeValue('surface_submergence_state',1,\@StartDry_Nids,\
 
 } # end if $surface_submergence_state
 
+
+#########################################################################
+# advection_state
+if ($advection_state){
+
+print "determining advection_state\n";
+
+my @PX=();
+my @PY=();
+foreach my $kmlFile (@AdvectionState_kmlPolygons){
+    my ($px,$py)=PolyTools::readKmlPoly("$kmlFile");
+    push @PX, $px;
+    push @PY, $py;
+};
+
+my @defVal=0;
+$adcGrid->addNodalAttribute('advection_state','na',1,\@defVal);
+
+my @AdvectionOff=();
+my @AdvectionOff_Nids=();
+my @AdvectionState_Vals=();
+my $advection_state_val;
+my @AdvectionState_Nids=(1..$np);
+
+foreach my $n (1..$np){
+   my $k=0;
+   foreach my $px (@PX){
+        my $py=$PY[$k];
+        my $inpoly=PolyTools::pointInPoly($X[$n],$Y[$n],$px,$py);
+        if ($inpoly) {
+            push @AdvectionOff, 1;
+            push @AdvectionOff_Nids, $n;
+	    $advection_state_val = @Z[$n]-1;
+	    push @AdvectionState_Vals, $advection_state_val;
+	    #$adcGrid->setNodalAttributeValue('advection_state',$advection_state_val
+            
+        }else{
+	    $advection_state_val = @Z[$n]+1;
+	    push @AdvectionState_Vals, $advection_state_val;
+	    last;
+        }
+        $k++;
+   }  
+}
+
+$adcGrid->setNodalAttributeValue('advection_state',1,\@AdvectionState_Nids,\@AdvectionState_Vals);
+
+} # end if advection_state
 
 
 ###############################################################################
