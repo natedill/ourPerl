@@ -726,6 +726,18 @@ sub WISoneLinePOT{
           $duration=shift @Duration; 
           $hr=shift @PeakHours;  
           shift @NN;
+          # if last one, and not less than min duration, we need to push it back on 
+          unless (@NN){
+             push @PEAKS, $peakHs;
+             push @PeakTimes, $peakT;
+             push @UpCrosses, $upCross;
+             push @DownCrosses, $downCross;
+             push @TP_atPeak, $peakTp;
+             push @DIR_atPeak, $peakDIR;
+             push @Duration, $duration;
+             push @PeakHours, $hr;
+         }
+
         } #end NN loop
       
         $minT=9999999;       
@@ -1140,8 +1152,19 @@ sub NOAA_gauge_POT{
           $duration=shift @Duration; 
           $hr=shift @PeakHours;  
           shift @NN;
+          # if this is the last one, and not less than min duration, we need to push it back on 
+          unless (@NN){
+             push @PEAKS, $peakWse;
+             push @PeakTimes, $peakT;
+             push @UpCrosses, $upCross;
+             push @DownCrosses, $downCross;
+             push @Duration, $duration;
+             push @PeakHours, $hr;
+          }
         } #end NN loop
-      
+     
+     
+ 
         $minT=9999999;       
         foreach my $n (0..$#PEAKS-1){
           my $dt=$PeakHours[$n+1]-$PeakHours[$n];
@@ -1461,34 +1484,34 @@ sub fitDistributions{
     }
 
     unless ($NOLOG){
-      print LOG "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-      print LOG "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print LOG "#-------------------------------------------------------------------------------------------------------------#\n";
+      print LOG "#---------------------------------------  Results Summary  ---------------------------------------------------#\n";
       print LOG "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
-      print "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-      print "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print "#-------------------------------------------------------------------------------------------------------------#\n";
+      print "#---------------------------------------  Results Summary  ---------------------------------------------------#\n";
       print "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
     }
     # sort by best fit and write results
     my @Sorted = sort {$MIR[$a] <=> $MIR[$b]} (0..$#MIR);
     my $str='';
     foreach my $rp (@RP){
-       $str.=sprintf("| %5d-yr ",$rp);
+       $str.=sprintf("|%5d-yr ",$rp);
     } 
     unless ($NOLOG){
-      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-      print LOG "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
-      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-      print "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+      print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
+      print LOG "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
+      print "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
+      print "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
     }
     foreach my $i (@Sorted){
          my @RV_=@{$RV[$i]};
          my $str='';
          foreach my $rv (@RV_){
-              $str.=sprintf("| %8.2f ",$rv);
+              $str.=sprintf("|%8.2f ",$rv);
          }
-          my $str2=sprintf("| %8s  | %5.2f | %7.3f | %7.3f | %7s | %7s | %7.3f | %7.3f   $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
+          my $str2=sprintf("|%8s | %5.2f |%6.3f |%6.3f |%7s |%7s |%6.3f |%6.3f  $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
          print LOG "$str2\n" unless ($NOLOG);
          print "$str2\n" unless ($NOLOG);
 
