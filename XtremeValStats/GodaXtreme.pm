@@ -1285,6 +1285,8 @@ sub NOAA_gauge_AnnualMax{
     my $product = $args{-PRODUCT};
     my $datum   = $args{-DATUM};
     my $units   = $args{-UNITS};
+    my $fracNeed=0.80;  # need at least this much fraction of a year for it to be counted 
+    $fracNeed=$args{-FRACNEED} if defined ($args{-FRACNEED});
     my $logFile="station-$stationID-begin-$beginDate-end-$endDate-$product-$units-$datum-AnnualMax_stats.log";
     $logFile=$args{-LOGFILE} if defined ($args{-LOGFILE});
     my $recsPerHour=1;
@@ -1325,9 +1327,13 @@ sub NOAA_gauge_AnnualMax{
     }
     
     # ingest the COOPS data
+    # record the max from each year
+    # count the number of records in each year
     open IN, "<$coopsFile" or die "Cant open $coopsFile";
     <IN>; #skip headerline
     my %WSE;
+    my %NRECS;
+    my %PEAK_TIME;
     while(<IN>){
        next unless ( $_ =~ m/(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d),(.+?),/);
        my $yyyy=$1;
@@ -1337,18 +1343,35 @@ sub NOAA_gauge_AnnualMax{
        my $MM=$5;
        my $wse=$6;
        if (defined $WSE{$yyyy}){
-           $WSE{$yyyy}=$wse if $wse > $WSE{$yyyy};
+           if ($wse > $WSE{$yyyy}){
+              $WSE{$yyyy}=$wse;
+              $PEAK_TIME{$yyyy}="$yyyy-$mm-$dd $HH:$MM";
+           }
+           $NRECS{$yyyy}++;
        }else{
            $WSE{$yyyy}=$wse;
+           $PEAK_TIME{$yyyy}="$yyyy-$mm-$dd $HH:$MM";
+           $NRECS{$yyyy}=1;
        }
     }
     close(IN);
   
+    # figure out the years that have enough data
+    my %FRACHAVE;
+    my $recsPerYear=$recsPerHour*24*365;
+   
+    foreach my $yyyy (keys %WSE){
+        $FRACHAVE{$yyyy}=$NRECS{$yyyy}/$recsPerYear;
+    }    
+
+
     my @YRS=();
     my @PEAKS=();
-    foreach my $year (1800..2100){
-       push @YRS,$year if defined $WSE{$year};
-       push @PEAKS,$WSE{$year} if defined $WSE{$year};
+    foreach my $yyyy (keys %WSE){
+       if ($FRACHAVE{$yyyy} >= $fracNeed){
+          push @YRS,$yyyy;
+          push @PEAKS,$WSE{$yyyy};
+       }
     }
     my $nyears=$#YRS+1;
 
@@ -1358,11 +1381,14 @@ sub NOAA_gauge_AnnualMax{
 
                #123456789012345678901234567890123456789012345678901234567890123456789012
     print LOG "#---------------------------- Rank Ordered Annual Maximums ---------------------------------#\n";
-    print LOG "Rank, $product ($units),  year\n";
+    my $daysNeed=365*$fracNeed;
+    print LOG "-FRACNEED = $fracNeed;  Only including years that have at least $daysNeed days of records\n";
+    print LOG "Rank, $product ($units),  year, days counted, peak datetime\n";
 
     my $rank=1;
     foreach my $i (@sorted_i){  
-       my $str=sprintf("%4d,%9.3f,  %16s,  %16s,  %16s,%9.1f",$rank,$PEAKS[$i],$YRS[$i]);
+       my $daysCounted=365*$FRACHAVE{$YRS[$i]};
+       my $str=sprintf("%4d,              %7.2f   ,  %4d,     %6.1f,   %s",$rank,$PEAKS[$i],$YRS[$i],$daysCounted,$PEAK_TIME{$YRS[$i]});
        print LOG "$str\n";
        $rank++; 
     }
