@@ -589,7 +589,7 @@ sub WISoneLinePOT{
           $upCross=$hr;
           $peakTp=$tp;
           $peakDIR=$dir;
-          while (@HS){
+          while (@HS){   # continue on to find down crossing.
               $hs = shift @HS; $t = shift @T; push @T, $t; $hr++;
               $tp=shift @TP; push @TP, $tp;
               $dir=shift @DIR; push @DIR, $dir;
@@ -622,6 +622,14 @@ sub WISoneLinePOT{
           unless (@HS){  # in case we end before a down-crossing
                push @PEAKS, $peakHs;
                push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               $downCross=-999;
+               push @DownCrosses, $downCross;
+               push @TP_atPeak, $peakTp;
+               push @DIR_atPeak, $peakDIR;
+               my $duration=$downCross-$upCross;
+               push @Duration, $duration;
+               push @PeakHours, $peakHr+1;
                $peakCount++;
 
                print "e!!!!!!!!nded before down crossing\n";
@@ -707,6 +715,7 @@ sub WISoneLinePOT{
                $hr=shift @PeakHours;  
                shift @NN;
             }
+            last unless (@NN);   # to correct for pathology that occurs if merging last two peaks.
           }else{
              push @PEAKS, $peakHs;
              push @PeakTimes, $peakT;
