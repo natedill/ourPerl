@@ -21,7 +21,7 @@ sub raster {
    @colors = &setColors($im,@{$cmapRef},$alpha);	
    my $transparent=$colors[0];
 
-   $cul=$cll+1 if $cul=$cll;  # to avoid divide by zero down below if bad cul and cll were specified
+   $cul=$cll+1 if ($cul <= $cll);  # to avoid divide by zero down below if bad cul and cll were specified
    my $dzdc=($cul-$cll)/127;
 
    my $i;
@@ -70,6 +70,7 @@ sub raster_wVectors {
 	
    my $transparent=$colors[0];
 
+   $cul=$cll+1 if ($cul <= $cll);  # to avoid divide by zero down below if bad cul and cll were specified
    my $dzdc=($cul-$cll)/127;
 
    my $i;
