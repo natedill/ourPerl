@@ -2265,18 +2265,61 @@ sub getInterpolant {
 
 	my $xx=$args{-XX};
 	my $yy=$args{-YY};
-        
-        $obj->{INTERPOLANT}=undef;
 
-	# try the last tree node first, before starting from the top of the tree
-        if ($obj->{LASTINDEX} > 0) {         
-            $obj->_getInterpolant($obj->{LASTINDEX},1,$xx,$yy);
-	    return $obj->{INTERPOLANT} if defined $obj->{INTERPOLANT};
+        if (ref($xx) =~ m/ARRAY/){
+          
+           my @ret;
+           my @X=@{$xx};
+           my @Y=@{$yy};                      
+my $k=0; 
+my $l=1;
+my $kk=$#X;
+           foreach my $x (@X){
+              my $y=shift(@Y);
+           
+              $obj->{INTERPOLANT}=undef;
+
+              # try the last tree node first, before starting from the top of the tree
+              if ($obj->{LASTINDEX} > 0) {         
+                  $obj->_getInterpolant($obj->{LASTINDEX},1,$x,$y);
+                  if (defined $obj->{INTERPOLANT}){
+                     push @ret, $obj->{INTERPOLANT};
+                     $k++;
+                     $l++;
+                     next;
+                  }
+              }
+
+              # start from the top if we didn't get it above
+              $obj->_getInterpolant(0,1,$x,$y);  
+
+              push @ret, $obj->{INTERPOLANT};
+$k++;
+$l++;
+if ($k>=10000){
+   $k=0;
+   print "$l of $kk interped\n";
+}
+ 
+           }
+           return \@ret;
+
+        }else{
+ 
+           $obj->{INTERPOLANT}=undef;
+
+           # try the last tree node first, before starting from the top of the tree
+           if ($obj->{LASTINDEX} > 0) {         
+               $obj->_getInterpolant($obj->{LASTINDEX},1,$xx,$yy);
+               return $obj->{INTERPOLANT} if defined $obj->{INTERPOLANT};
+           }
+
+           # start from the top if we didn't get it above
+           $obj->_getInterpolant(0,1,$xx,$yy);  
+           return $obj->{INTERPOLANT};
+
         }
 
-	# start from the top if we didn't get it above
-        $obj->_getInterpolant(0,1,$xx,$yy);  
-	return $obj->{INTERPOLANT};
 }
 
 sub _getInterpolant {
