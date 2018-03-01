@@ -27,7 +27,7 @@ my $fullDomainOutput='fort.63';
 my $coldStartDate= '20080813013000';
 
 my $animationStartDate='20010917000000';  # set to undef if you want whole timeseries
-my $animationEndDate='20010920000000'
+my $animationEndDate='20010920000000';
 
 # name for output kmz file
 my $kmzFile='WSE.kmz';
@@ -165,6 +165,7 @@ while (<F63>){
     $coldStartDate =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
     my ($yr,$mo,$da,$hr,$mn,$sc)=Date::Pcalc::Add_Delta_YMDHMS($1,$2,$3,$4,$5,$6,0,0,0,0,0,$time);
     my $begin=sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",$yr,$mo,$da,$hr,$mn,$sc);
+    my $now=sprintf("%04d%02d%02d%02d%02d%02d",$yr,$mo,$da,$hr,$mn,$sc);
     $time=$time+$nspooleit;
     ($yr,$mo,$da,$hr,$mn,$sc)=Date::Pcalc::Add_Delta_YMDHMS($1,$2,$3,$4,$5,$6,0,0,0,0,0,$time);
     my $end=sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",$yr,$mo,$da,$hr,$mn,$sc);
