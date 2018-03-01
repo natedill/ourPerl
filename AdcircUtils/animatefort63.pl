@@ -176,7 +176,6 @@ while (<F63>){
        if ($now < $animationStartDate){
            foreach my $nid (1..$np){
                <F63>;
-               <F64>;
            }
            next;
        }
