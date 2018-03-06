@@ -108,7 +108,7 @@ sub newFromSim {
              $key =~ m/^(.*)\((\d+)\)$/;
              $key = $1;
              $obj->{$listName}->{$key}=[] unless defined ($obj->{$listName}->{$key}); # create the empty anon arrays the first time
-             push $obj->{$listName}->{$key}, [$2, $value]; # two element anon array, with the first value the array index.
+             push @{$obj->{$listName}->{$key}}, [$2, $value]; # two element anon array, with the first value the array index.
           }else{
              $obj->{$listName}->{$key}=$value;
              print "$listName $key = $value\n";
@@ -1013,7 +1013,7 @@ sub writeSimFile{
           foreach my $rec (0..$numRecs){
               my $str='';
               foreach my $ar (@ARRS){
-                    my $a=shift $ar;
+                    my $a=shift @{$ar};
                     my $parm=shift @PARMS;
                     push @PARMS, $parm;
 
@@ -1138,7 +1138,7 @@ sub interpDepFromScatter{
     # one field 
     my $field='depth';
     $obj->{$dataName}->{fieldNames}=[];
-    push $obj->{$dataName}->{fieldNames},$field;
+    push @{$obj->{$dataName}->{fieldNames}},$field;
     #binstring $obj->{$dataName}->{$field}=\@DEP;
     foreach my $dep (@DEP){
         $obj->{$dataName}->{$field} .= pack ("d",$dep);
