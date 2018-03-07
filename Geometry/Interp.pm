@@ -348,10 +348,60 @@ sub bicubic{
 
 
 
+############################################################
+#
+#  $y = Interp::bilinear($x,$y,\@PX,\@PY,\@Z)
+#
+#  returns the bilinear interpolated value from @Z at the point $x,y
+#
+#  @Z is list of data in a row major order from the top down
+#  @Z has ($#PX+1)*($#PY+1) elements
+#
+#  assumes PY is decreasing values (from the top down)  
+#
+sub bilinear{
+   my ($x,$y,$px,$py,$z)=@_;
+   my @PX=@{$px};
+   my @PY=@{$py};
+   my @Z=@{$z};
+
+   my $errLev=0;
+   
+   if (($y < $PY[$#PY-1]) or ($y > $PY[1]) or ($x < $PX[1]) or ($x > $PX[$#PX-1])){
+     print "ERROR: Interp::bicubic: x or y is out of PX or PY range\n" if $errLev >0 ;
+     return undef;
+   }
 
 
+   # find what row were on
+   my $j=0;
+   while (1==1){
+      last if (($y <= $PY[$j]) and ($y > $PY[$j+1]));
+      $j++;
+   } 
+   # find what col were on
+   my $i=0;
+   while (1==1){
+      last if (($x <= $PX[$i+1]) and ($x > $PX[$i]));
+      $i++;
+   } 
 
+     
+   # interpolate across rows
+   my $ncols=$#PX+1;   
+   my $w=($x-$PX[$i])/($PX[$i+1]-$PX[$i]);
+   # at row j
+   my $k=$j*$ncols+$i;  # index into Z array for upper left point
+   my $z1=$Z[$k]+$w*($Z[$k+1] - $Z[$k]);
+   # at row j+1
+   $k=($j+1)*$ncols+$i;  # index into Z array for upper left point
+   my $z2=$Z[$k]+$w*($Z[$k+1] - $Z[$k]);
 
+   # interp down column
+   $w=($y-$PY[$j])/($PY[$j+1]-$PY[$j]);
+   return $z1+$w*($z2-$z1);
+
+}
 
 
 

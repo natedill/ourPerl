@@ -105,8 +105,7 @@ GetOptions('station:i'     => \$station,
            'interval:s'    => \$interval,
 	   'format:s'      => \$format,
 	   'bin:s'         => \$bin,
-           'application:s' => \$application,
-           'out:s'         => \$outFileName);
+           'application:s' => \$application);
 
 $application='RansomConsulting';
 

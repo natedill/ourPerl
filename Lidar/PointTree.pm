@@ -451,7 +451,8 @@ sub _decrementPoint{
 # I.e. pixel values will ultimately be the average 
 # elevation of all points that are within that pixel
 #
-#
+# this name should probably be changed to avoid
+# confusion with "setPixel" method in the GD module
 ####################################################
 sub setPixel {
 
@@ -742,7 +743,7 @@ sub _writeKMLOverlay{
          print FILE "        <overlayXY x=\"0\" y=\"1\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
          print FILE "        <screenXY x=\"0.01\" y=\".99\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
          print FILE "        <rotationXY x=\"0\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
-         print FILE "        <size x=\".5333333\" y=\"0.1\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+         print FILE "        <size x=\".6\" y=\"0.15\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
          print FILE "     </ScreenOverlay>\n";
          print FILE "   </Folder>\n";
       }       
@@ -837,6 +838,336 @@ sub _writeKMLOverlay{
       
      
 }
+
+
+
+
+
+#######################################################
+# sub writeKMLPoints(                                 #  public method
+#                    -COLORFILE=>'c:/ourPerl/jet.txt',
+#                    -CLIM1=>$CLIM[0],
+#                    -CLIM2=>$CLIM[1],
+#                    -NUMCOLORS=>$numColors,
+#                    -ZADDADJUST=>$addAdjust,
+#                    -ZMULTADJUST=>$multAdjust,
+#                    -KMLDIR=>'Files',
+#                    -PNGDIR=>'Images',
+#                    -CBARTITLE=>'Elevation ft-NAVD88'
+#                   ) 
+#
+# writes the kml for Points 
+# writes network linked superoverlay type structure
+# but with kml files containing points rather
+# than ground overlays
+#######################################################
+sub writeKMLPoints{
+   my $obj = shift;
+   my %args=@_;
+   
+   # some defaults
+   $obj->{KMLDIR}='pFiles';
+   $obj->{PNGDIR}='pImages';
+   $obj->{NUMCOLORS}=16;
+   $obj->{ZADDADJUST}=0;
+   $obj->{ZMULTADJUST}=1; 
+   $obj->{COLORFILE}='c:/ourPerl/jet.txt';	
+   $obj->{CLIM1}=-10;
+   $obj->{CLIM2}=10;
+   $obj->{CBARTITLE}='colorbar title';
+
+   $obj->{KMLDIR}=$args{-KMLDIR} if defined $args{-KMLDIR};
+   $obj->{PNGDIR}=$args{-PNGDIR} if defined $args{-KMLDIR};
+   $obj->{NUMCOLORS}=$args{-NUMCOLORS} if defined $args{-NUMCOLORS};
+   $obj->{ZADDADJUST}=$args{-ZADDADJUST} if defined $args{-ZADDADJUST};
+   $obj->{ZMULTADJUST}=$args{-ZMULTADJUST} if defined $args{-ZMULTADJUST}; 
+   $obj->{COLORFILE}=$args{-COLORFILE} if defined $args{-COLORFILE};	
+   $obj->{CLIM1}=$args{-CLIM1} if defined $args{-CLIM1};
+   $obj->{CLIM2}=$args{-CLIM2} if defined $args{-CLIM2};
+   $obj->{CBARTITLE}=$args{-CBARTITLE} if defined $args{-CBARTITLE};
+
+   # make directories to hold images and kml
+   mkdir("$obj->{KMLDIR}");
+   mkdir("$obj->{PNGDIR}");
+
+   # make colorbar and color dots files
+   $obj->loadColormap($obj->{COLORFILE});
+   $obj->makeColorDots();
+   $obj->makeColorbar($obj->{CBARTITLE});
+
+   print "writing kml points\n";
+
+   $obj->_writeKMLPoints(0,1);    # index, depth - for top layer
+
+}
+
+
+#######################################################
+# sub _writeKMLPoints() -  private method actually does the work
+#
+#######################################################
+
+sub _writeKMLPoints{
+   my ($obj, $index, $depth) = @_;
+   return unless($obj->{INTREE});  # don't write kml for nodes that are empty
+       
+   my $kmlDir=$obj->{KMLDIR};
+   my $pngDir=$obj->{PNGDIR};
+ 
+   my $kmlFile;
+   my @kids = @{$obj->{CHILDREN}[$index]};
+	 
+   my $minLOD=128;
+   my $maxLOD=512;
+   unless (@kids) {$maxLOD=-1;}
+
+   my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
+
+        
+   if ($index ==0 ) {
+      $kmlFile = "doc.kml";
+   }else{  
+      $kmlFile = "$kmlDir/over$index.kml";
+   }
+         
+   print "filename $kmlFile\n";
+
+   # file beginning
+   open FILE, ">$kmlFile" or die "can not open $kmlFile";
+   print FILE '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+   print FILE '<kml xmlns="http://www.opengis.net/kml/2.2">'."\n";
+   print FILE "   <Document>\n";
+
+   # write kml for styles and colorbar screen overlay if at top level doc.kml
+   if ($index==0) {
+
+      #write styles
+      my $color=0;
+      while ($color<=128) {	 
+        my $style="Style$color";  
+        my $pngFile="$color.png";
+        print FILE "    <Style id=\"$style\">\n";
+        print FILE "      <IconStyle>\n";
+        print FILE "         <Icon><href>$obj->{PNGDIR}/$pngFile</href></Icon>\n";
+        print FILE "         <scale>0.5</scale>\n";
+        print FILE "      </IconStyle>\n";
+        print FILE "      <BalloonStyle>\n";
+        print FILE '         <text>$[description]</text>\n';
+        print FILE "      </BalloonStyle>\n";
+        print FILE "    </Style>\n";
+        $color++;
+      }
+      print FILE "   <Folder>\n";
+      print FILE "     <Region>\n";
+      print FILE "       <LatLonAltBox>\n";
+      print FILE "          <north>$north</north>\n";
+      print FILE "          <south>$south</south>\n";
+      print FILE "          <east>$east</east>\n";
+      print FILE "          <west>$west</west>\n";
+      print FILE "       </LatLonAltBox>\n";
+      print FILE "       <Lod>\n";
+      print FILE "           <minLodPixels>128</minLodPixels><maxLodPixels>-1</maxLodPixels>\n";
+      print FILE "           <minFadeExtent>0</minFadeExtent> <maxFadeExtent>0</maxFadeExtent>\n";
+      print FILE "       </Lod>\n";
+      print FILE "     </Region>\n";
+      print FILE "     <ScreenOverlay>\n";
+      print FILE "       <name>colograr</name>\n";
+      print FILE "        <Icon>\n";
+      print FILE "           <href>$obj->{PNGDIR}/colorbar.png</href>\n";
+      print FILE "        </Icon>\n";
+      print FILE "        <overlayXY x=\"0\" y=\"1\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+      print FILE "        <screenXY x=\"0.01\" y=\".99\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+      print FILE "        <rotationXY x=\"0\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+      print FILE "        <size x=\".6\" y=\"0.15\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+      print FILE "     </ScreenOverlay>\n";
+      print FILE "   </Folder>\n";
+   }     
+
+   # region for this node
+   print FILE "      <Region>\n";
+   print FILE "         <LatLonAltBox>\n";
+   print FILE "	       <north>$north</north>\n";
+   print FILE "	       <south>$south</south>\n";
+   print FILE "	       <east>$east</east>\n";
+   print FILE "	       <west>$west</west>\n";
+   print FILE "         </LatLonAltBox>\n";
+   print FILE "      <Lod>\n";
+   print FILE "	       <minLodPixels>$minLOD</minLodPixels><maxLodPixels>$maxLOD</maxLodPixels>\n";
+   print FILE "            <minFadeExtent>0</minFadeExtent> <maxFadeExtent>0</maxFadeExtent>\n";
+   print FILE "	     </Lod>\n";
+   print FILE "	  </Region>\n";
+
+   # points kml for this node
+   # network links to children
+   if (@kids) {    # if it has kids it is not a leaf, just write the network links
+      foreach my $kid (@kids) {
+         next unless($obj->{INTREE}[$kid]);	# dont write the link for children that dont have elements in them
+         my $lnkName="over$kid.kml";
+         ($north, $south, $east, $west) = @{$obj->{REGION}[$kid]};
+          
+         print FILE "	  <NetworkLink>\n";
+         print FILE "	    <name>$kid</name>\n";
+         print FILE "	    <Region>\n";
+         print FILE "	      <Lod>\n";
+         print FILE "            <minLodPixels>$minLOD</minLodPixels><maxLodPixels>$maxLOD</maxLodPixels>\n";
+         print FILE "            <minFadeExtent>0</minFadeExtent> <maxFadeExtent>0</maxFadeExtent>\n";
+         print FILE "	      </Lod> \n";
+         print FILE "	      <LatLonAltBox>\n";
+         print FILE "	        <north>$north</north>\n";
+         print FILE "	        <south>$south</south>\n";
+         print FILE "	        <east>$east</east>\n";
+         print FILE "	        <west>$west</west>\n";
+         print FILE "	      </LatLonAltBox>\n";
+         print FILE "	    </Region>\n";
+         print FILE "	    <Link>\n";
+         if ($index==0) {
+            print FILE "	      <href>$kmlDir/$lnkName</href>\n";
+         }else{
+            print FILE "	      <href>$lnkName</href>\n";
+         }
+         print FILE "	      <viewRefreshMode>onRegion</viewRefreshMode>\n";
+         print FILE "	     </Link>\n";
+         print FILE "	  </NetworkLink>\n";
+      }
+   }else{  # leaf nodes have no kids, write kml points instead
+      my $superfinalized;
+      # loop through all points in leaf node and write the kml
+      # open a fialized file
+      if (defined $obj->{SFINALIZED}){
+         print "making KML points using superfinalized file $obj->{SFINALIZED} \n";
+         open FH, "<$obj->{SFINALIZED}" or die "PointTree::writeKMLPoints can not open $obj->{SFINALIZED}\n";
+         $superfinalized=1;
+      }else{
+         die "no super-finalized binary points file has been assigned to the tree\n";
+      }
+      binmode(FH);
+     
+      my $offset =  $obj->{BEGINOFFSET}->[$index];
+      my $buffer;
+      seek(FH,$offset,0);
+      read(FH,$buffer,8);
+      my ($chkIndex,$npoints)=unpack('L2',$buffer);
+      unless (defined $chkIndex){  # maybe incomplete file
+         print "undefined chkIndx at offset $offset\n";
+         next;     
+      }
+      unless ($chkIndex == $index){
+          print "whoa $chkIndex does not match file $index at offset $offset\n";
+          next;
+      }
+      foreach my $point (1..$npoints){
+         read(FH,$buffer,26);
+         next unless ($buffer);
+         my ($x,$y,$z,$id)=unpack('d3n',$buffer);
+         my $pmark=$obj->writePointPlacemark($x,$y,$z,$id);
+         print FILE "$pmark";
+      } 
+      close(FH);
+   }# end if @kids
+
+   print FILE " </Document>\n";
+   print FILE "</kml>\n";
+   close (FILE);
+      
+   return unless (@kids);
+   foreach my $kid (@kids) {
+      next unless($obj->{INTREE}[$kid]);  # don't write kml for tree nodes with no elemets under them
+      $obj->_writeKMLPoints($kid, $depth+1);
+   }
+}
+
+# private sub for writing a string of a point placemark
+sub writePointPlacemark{
+   my $obj=shift;
+   my ($x,$y,$z,$id)=@_;
+   $z=$z*$obj->{ZMULTADJUST}+$obj->{ZADDADJUST};
+
+   my $style =int( 128* ($z-$obj->{CLIM1})/($obj->{CLIM2}- $obj->{CLIM1}));
+ 
+   $style = 128 if ($style > 128);
+   $style = 1   if ($style <1) ; 
+
+   my $pmark='';
+   $pmark.= "     <Placemark>\n";
+   $pmark.= "        <name></name>\n";
+   $pmark.= "        <styleUrl>../doc.kml#Style$style</styleUrl>\n";
+   $pmark.= "        <description>\n";
+   #$pmark.= "         <p><b>$desc</b></p>\n";
+   my $elevstring=sprintf ("%7.3f",$z);
+   $pmark.= "         <p> Elev = $elevstring</p>\n";
+   $pmark.= "         <p> Class = $id</p>\n";
+   $pmark.= "        </description>\n";
+   $pmark.= "        <Point>\n ";
+   $pmark.= "          <coordinates>$x,$y,$z</coordinates>\n";
+   $pmark.= "        </Point>\n";
+   $pmark.= "     </Placemark>\n";
+   return $pmark;
+}
+
+
+####################################################
+# sub makeColorDots()
+#
+# this subroutine makes a bunch of png files with color dots
+#
+################################################ 
+
+sub makeColorDots {
+  my $obj=shift;
+
+  my $pngDir='Images';
+  $pngDir=$obj->{PNGDIR} if (defined $obj->{PNGDIR});
+
+  my $xpix=64;
+  my $ypix=64;
+  my $imid=$xpix/2;
+  my $jmid=$ypix/2;
+
+  my $color=128;
+
+  while ($color>0) {
+
+     my $im = new GD::Image($xpix,$ypix);
+        &setColors($im,@{$obj->{COLORMAP}}); 
+	
+        my $i;
+        my $j =  0;
+        my $cnt = 0;	
+	while ($j<$ypix) {
+	      $i=0;	
+              while ($i<$xpix) {
+                    my $r = sqrt(($i-$imid)**2 + ($j-$jmid)**2);
+		     
+		    if ($r<$imid) {
+                       $im->setPixel($i,$j,$color);   #set the pixel color based on the map
+	            }else{
+                       $im->setPixel($i,$j,0);   #set the pixel color based on the map
+	            }
+		  $i++;
+	      }
+	      $j++;
+        }
+
+        # now write the png file
+	my $pngFile= "$pngDir/$color.png";
+	open FILE2, ">$pngFile";
+	binmode FILE2;
+	print FILE2 $im->png;
+	close(FILE2);
+        $im=undef;
+
+	$color--;
+  }
+
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -1092,7 +1423,8 @@ sub makeColorbar {
    if (defined $self->{NUMCOLORS}) {
            $numColors=$self->{NUMCOLORS};
    }
-   my $pngDir=$self->{PNGDIR};     
+   my $pngDir='Images';
+   $pngDir=$self->{PNGDIR} if (defined $self->{PNGDIR});     
 
    my $xpix=550;
    my $ypix=100;
@@ -2788,6 +3120,7 @@ sub getPoints_sorted{
     @DSQ=@DSQ[@SortedI];
     return (\@X,\@Y,\@Z,\@S,\@DSQ);
 }
+
 
 
 

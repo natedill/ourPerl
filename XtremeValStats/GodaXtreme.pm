@@ -39,6 +39,9 @@ package GodaXtreme;
 use strict;
 use warnings;
 
+use lib 'c:\ourPerl';   # only needed foro NOAA_gauge_POT
+use Date::Pcalc;        # only needed foro NOAA_gauge_POT
+
 #################################################################
 # sub read_stats
 #
@@ -586,7 +589,7 @@ sub WISoneLinePOT{
           $upCross=$hr;
           $peakTp=$tp;
           $peakDIR=$dir;
-          while (@HS){
+          while (@HS){   # continue on to find down crossing.
               $hs = shift @HS; $t = shift @T; push @T, $t; $hr++;
               $tp=shift @TP; push @TP, $tp;
               $dir=shift @DIR; push @DIR, $dir;
@@ -619,6 +622,14 @@ sub WISoneLinePOT{
           unless (@HS){  # in case we end before a down-crossing
                push @PEAKS, $peakHs;
                push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               $downCross=-999;
+               push @DownCrosses, $downCross;
+               push @TP_atPeak, $peakTp;
+               push @DIR_atPeak, $peakDIR;
+               my $duration=$downCross-$upCross;
+               push @Duration, $duration;
+               push @PeakHours, $peakHr+1;
                $peakCount++;
 
                print "e!!!!!!!!nded before down crossing\n";
@@ -704,6 +715,7 @@ sub WISoneLinePOT{
                $hr=shift @PeakHours;  
                shift @NN;
             }
+            last unless (@NN);   # to correct for pathology that occurs if merging last two peaks.
           }else{
              push @PEAKS, $peakHs;
              push @PeakTimes, $peakT;
@@ -723,6 +735,18 @@ sub WISoneLinePOT{
           $duration=shift @Duration; 
           $hr=shift @PeakHours;  
           shift @NN;
+          # if last one, and not less than min duration, we need to push it back on 
+          unless (@NN){
+             push @PEAKS, $peakHs;
+             push @PeakTimes, $peakT;
+             push @UpCrosses, $upCross;
+             push @DownCrosses, $downCross;
+             push @TP_atPeak, $peakTp;
+             push @DIR_atPeak, $peakDIR;
+             push @Duration, $duration;
+             push @PeakHours, $hr;
+         }
+
         } #end NN loop
       
         $minT=9999999;       
@@ -834,6 +858,564 @@ sub WISoneLinePOT{
 
 
 
+#############################################################
+# sub NOAA_gauge_POT
+# 
+# e.g. NOAA_gauge_POT(
+#                     -STATIONID => $stationID,    # NOAA station ID number
+#                     -BEGINDATE => $beginDate,    # yyyymmdd
+#                     -ENDDATE   => $endDate,      # yyyymmdd
+#                     -PRODUCT   => $product,      # e.g. hourly_height, water_level, wind  
+#                     -DATUM     => $datum,        # e.g. MHHW,MHW,DTL,MTL,MSL,MLW,MLLW,GT,MN,DHQ,DLQ,NAVD
+#                     -UNITS     => $units,        # e.g. metric or english
+#                     -THRESHOLD => $threshold,    # threshold value for POT
+#                     -LOGFILE   => $logFile,      # optional name of logfile
+#                     -RECORDFREQ => $recsPerHour, # e.g. 10 for 6 minute "water_level",  1 for hourly_height
+#                     -MINEVENTDURATION => $minEventDuration,    # optional, event duration in hours,  default is 24 hours    
+#                     -COOPSFILE => $coopsFile     # optional name of file downloaded with getCOOPS.pl with time series data
+#                   )                              # specify this if you have already dowlnoaded the data from CO-OPS 
+#
+
+sub NOAA_gauge_POT{
+    my %args=@_;
+    my $stationID=$args{-STATIONID};
+    my $beginDate=$args{-BEGINDATE};
+    my $endDate = $args{-ENDDATE};
+    my $product = $args{-PRODUCT};
+    my $datum   = $args{-DATUM};
+    my $units   = $args{-UNITS};
+    my $threshold=$args{-THRESHOLD};
+    my $logFile="station-$stationID-begin-$beginDate-end-$endDate-$product-$units-$datum-threshold-$threshold-POT_stats.log";
+    $logFile=$args{-LOGFILE} if defined ($args{-LOGFILE});
+    my $recsPerHour=1;
+    $recsPerHour=10 if ($product =~ m/water_level/i); 
+    $recsPerHour=$args{-RECORDFREQ} if defined ($args{-RECORDFREQ});
+    my $minEventDuration = 24;  # hours
+    $minEventDuration = $args{-MINEVENTDURATION} if defined ($args{-MINEVENTDURATION});
+    $minEventDuration=$minEventDuration*$recsPerHour;
+    my $coopsFile= 0;
+    $coopsFile = $args{-COOPSFILE} if defined ($args{-COOPSFILE});;
+
+  
+    open LOG, ">>$logFile" or die "ERROR:  GodaXtreme.pm:  fitWISoneLine:  cant open logfile $logFile for writing\n";
+              #         1         2         3         4         5         6         7
+              #123456789012345678901234567890123456789012345678901234567890123456789012
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#--------- Statistical Analysis of Extreme $product --------------#\n";
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG '  Reference:  Yoshimi Goda, 2010, "Random Seas and Design of Maritime ',"\n";
+    print LOG "              Structures\", 3rd edition. Chapter 13.                   \n";  
+    print LOG "#                                                                      #\n";
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#                                                                      #\n";
+          #123456789012345678901234567890123456789012345678901234567890123456789012
+    print "\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#--------- Statistical Analysis of Extreme $product ---------------#\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  '  Reference:  Yoshimi Goda, 2010, "Random Seas and Design of Maritime ',"\n";
+    print  "              Structures\", 3rd edition. Chapter 13.                   \n";  
+    print  "#                                                                      #\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#                                                                      #\n";
+     
+    # get the COOPS data if we don't have it already
+    unless ($coopsFile){
+       $coopsFile="$stationID-$product-$datum-$units-$beginDate-$endDate".'.csv';
+       my $cmdstr="perl getCoopsdata.pl --station $stationID --begin $beginDate --end $endDate --product $product --datum $datum --units $units --timezone GMT --format CSV --outfile $coopsFile";
+       print "Getting COOPS data with command: $cmdstr\n";
+       system($cmdstr);
+    }
+    
+    # ingest the COOPS data
+    open IN, "<$coopsFile" or die "Cant open $coopsFile";
+    <IN>; #skip headerline
+    my @WSE;
+    my @HR;
+    my @T;
+    my $firstline=1;
+    my ($yyyy0,$mm0,$dd0,$HH0,$MM0);
+    while(<IN>){
+       next unless ( $_ =~ m/(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d),(.+?),/);
+       my $yyyy=$1;
+       my $mm=$2;
+       my $dd=$3;
+       my $HH=$4;
+       my $MM=$5;
+       my $wse=$6;
+       if ($firstline){
+          ($yyyy0,$mm0,$dd0,$HH0,$MM0)= ($yyyy,$mm,$dd,$HH,$MM);
+       }
+       my ($D_d, $Dh,$Dm,$Ds) = Date::Pcalc::Delta_DHMS($yyyy0,$mm0,$dd0,$HH0,$MM0,0,
+                                                       $yyyy ,$mm ,$dd ,$HH ,$MM ,0);
+       my $hr=$D_d*24+$Dh+$Dm/60 + $Ds/3600;
+       push @HR,$hr;
+       push @T,"$yyyy"."$mm"."$dd"."$HH"."$MM".'00';
+       push @WSE,$wse;   
+       $firstline=0;
+    }
+    close(IN);
+   
+    print LOG "  INFO read from COOPS file: $coopsFile\n";
+    print LOG "     NOAA station:  $stationID\n";
+    print "  INFO read from COOPS file: $coopsFile\n";
+    print "     NOAA station:  $stationID\n";
+  
+ 
+    my $str=$T[0];
+    $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+    my $t = "$1-$2-$3 $4:$5";
+    print LOG "     First Record:  $t\n";
+    $str=$T[$#T];
+    $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+    $t = "$1-$2-$3 $4:$5";
+    print LOG "     Last  Record: $t\n";
+    my $nrecs=$#T+1;
+    print LOG "     Number of Records: $nrecs\n";
+    # check for missing data
+    # fill in holes with dummy data below threshold
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#--------------------- Check for misssing data ------------------------#\n";
+    print LOG "#                                                                      #\n";
+    my $dt0=1/$recsPerHour;
+    my $k=0;
+    my $nt=$#T;
+    while ($k < $nt-1){
+       my $hr=shift(@HR); push @HR,$hr;
+       my $wse=shift(@WSE); push @WSE, $wse;
+       my $t=shift(@T); push @T, $t;
+       my $dh= $HR[0] - $hr;
+       if ( $dh > $dt0 ){
+          my $dx=$dh/24;
+          my $str=sprintf("%7.2f",$dx);
+          print LOG "Missing data $str days between $t and $T[0]\n";
+          $hr=$hr+$dt0;
+          while ($hr<$HR[0]){
+              push @HR,$hr;
+              push @T,'0000-00-00';
+              push @WSE,$threshold-100;
+              $hr=$hr+$dt0;
+          }
+          
+       }
+       $k++;
+    }
+  
+    open TMP,">dummiesFilledIn.csv";
+    foreach my $k (0..$#WSE){
+       print TMP "$T[$k],$HR[$k],$WSE[$k]\n";
+    }
+    close (TMP);
+
+
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#--------------------- Chronological peak data ------------------------#\n";
+    print LOG "#                                                                      #\n";
+    my $thres_=sprintf("%4.2f",$threshold);
+    print LOG "#--- Events with peak $product exceeding $thres_ $units ---#\n";
+    print LOG "#                                                                      #\n";
+    print LOG "   Peak,     Time      ,   Record , Duration,  value \n";     
+   
+    # now find the peaks over threshold
+    my @PEAKS;
+    my $peakCount=0;
+    my @PeakTimes;
+    my $hr=-1;
+    my @PeakHours;
+    my $upCross;
+    my $downCross;
+    my @UpCrosses;
+    my @DownCrosses;
+    my @Duration;
+    while (@WSE){
+       my $wse = shift(@WSE);  my $t = shift (@T); push @T, $t; $hr+=1/$recsPerHour;
+       my $peakWse=0;    my $peakT;
+       my $peakHr;
+     #  my $peakTp; my $peakDIR;
+       if ($wse >= $threshold){      # up-crossing of threshold
+          $peakWse=$wse;
+          $peakT=$t;
+          $peakHr=$hr;
+          $upCross=$hr;
+         # $peakTp=$tp;
+         # $peakDIR=$dir;
+          while (@WSE){
+              $wse = shift @WSE; $t = shift @T; push @T, $t; $hr+=1/$recsPerHour;
+             # $tp=shift @TP; push @TP, $tp;
+             # $dir=shift @DIR; push @DIR, $dir;
+              if ($wse > $peakWse){
+                 $peakWse=$wse;
+                 $peakT=$t;
+                 $peakHr=$hr;
+                # $peakTp=$tp;
+                # $peakDIR=$dir;
+              } 
+              if ( $wse < $threshold ){  # down-crossing of threshold
+                 $downCross=$hr;
+                 push @PEAKS, $peakWse;
+                 push @PeakTimes, $peakT;
+                 push @UpCrosses, $upCross;
+                 push @DownCrosses, $downCross;
+               #  push @TP_atPeak, $peakTp;
+               #  push @DIR_atPeak, $peakDIR;
+                 my $duration=$downCross-$upCross;
+                 push @Duration, $duration;
+                 push @PeakHours, $peakHr;
+                 $peakCount++;
+                 $str=sprintf("   %4d, %13s,%10d, %8d,  %4.2f",$peakCount,$peakT,$peakHr,$duration,$peakWse);
+                 #print LOG "peak $peakCount, time $peakT, record $hr, duration $duration, Hs= $peakHs, dir=$peakDIR, Tp=$peakTp \n";
+                 print LOG "$str\n";
+                 last;
+              }    
+          }
+          unless (@WSE){  # in case we end before a down-crossing
+               push @PEAKS, $peakWse;
+               push @PeakTimes, $peakT;
+               $peakCount++;
+
+               print "e!!!!!!!!nded before down crossing\n";
+               print LOG "e!!!!!!!!nded before down crossing\n";
+              # print LOG "#-- peak $peakCount at time $peakT is $peakHs\n";
+          }
+       }
+    }
+
+    
+
+    # check to see if we need to merge peaks
+    if ($minEventDuration > 1/$recsPerHour){
+      print LOG "#----------------------------------------------------------------------#\n";
+      print LOG "Check if peaks are within minEventDuration $minEventDuration hours and should be merged\n";
+      print LOG "#----------------------------------------------------------------------#\n";
+
+      my $minT=-99999999;
+
+      my $iter=0;
+     
+      while ($minT < $minEventDuration){
+  
+        $iter++;
+        print LOG "Peak merging iteration: $iter\n";
+
+
+        my $peakWse=shift @PEAKS; 
+        my $peakT=shift @PeakTimes; 
+        my $upCross=shift @UpCrosses; 
+        my $downCross=shift @DownCrosses;
+        my $duration=shift @Duration; 
+        my $hr=shift @PeakHours;  
+        my @NN=(0..$#PEAKS);
+        while (@NN){
+          my $dt_peaks=$PeakHours[0]-$hr;
+          if ($dt_peaks < $minEventDuration) {
+             $str=$peakT;
+             $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+             my $t1 = "$1-$2-$3 $4:$5";
+             $str=$PeakTimes[0];
+             $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+             my $t2 = "$1-$2-$3 $4:$5";
+             print LOG "*-- Merge Peaks iter: $iter, $peakWse (at $t1) and $PEAKS[0] (at $t2)\n";
+             if ($PEAKS[0] > $peakWse){  # keep n+1, shift then push, keep first upcross
+               $peakWse=shift @PEAKS; 
+               $peakT=shift @PeakTimes; 
+               $upCross=shift @UpCrosses; 
+               $downCross=shift @DownCrosses;
+               $duration=shift @Duration; 
+               $hr=shift @PeakHours;  
+               shift @NN;
+               push @PEAKS, $peakWse;
+               push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               push @DownCrosses, $downCross;
+               push @Duration, $duration;
+               push @PeakHours, $hr;
+               print LOG "    keeping Higher Later peak of $peakWse at hour $hr (at $t2)\n";
+             }else{ #keep n            push then shift
+               push @PEAKS, $peakWse;
+               push @PeakTimes, $peakT;
+               push @UpCrosses, $upCross;
+               push @DownCrosses, $downCross;
+               push @Duration, $duration;
+               push @PeakHours, $hr;
+               print LOG "    keeping Higher Earlier peak of $peakWse at hour $hr (at $t1)\n";
+               $peakWse=shift @PEAKS; 
+               $peakT=shift @PeakTimes; 
+               $upCross=shift @UpCrosses; 
+               $downCross=shift @DownCrosses;
+               $duration=shift @Duration; 
+               $hr=shift @PeakHours;  
+               shift @NN;
+            }
+          }else{
+             push @PEAKS, $peakWse;
+             push @PeakTimes, $peakT;
+             push @UpCrosses, $upCross;
+             push @DownCrosses, $downCross;
+             push @Duration, $duration;
+             push @PeakHours, $hr;
+          }  # not less than min duration
+          $peakWse=shift @PEAKS; 
+          $peakT=shift @PeakTimes; 
+          $upCross=shift @UpCrosses; 
+          $downCross=shift @DownCrosses;
+          $duration=shift @Duration; 
+          $hr=shift @PeakHours;  
+          shift @NN;
+          # if this is the last one, and not less than min duration, we need to push it back on 
+          unless (@NN){
+             push @PEAKS, $peakWse;
+             push @PeakTimes, $peakT;
+             push @UpCrosses, $upCross;
+             push @DownCrosses, $downCross;
+             push @Duration, $duration;
+             push @PeakHours, $hr;
+          }
+        } #end NN loop
+     
+     
+ 
+        $minT=9999999;       
+        foreach my $n (0..$#PEAKS-1){
+          my $dt=$PeakHours[$n+1]-$PeakHours[$n];
+          $minT=$dt if $dt < $minT;
+        } 
+        print LOG "Iteration: $iter, Minimum time between peaks is: $minT hours\n";
+
+      } #end iterative megring while loop
+      
+    }# end if checking need to merge peaks
+
+
+    # calculate some stats as a sanity check on the peak duration and time between peaks
+    my $totalDuration=$nrecs/24/365.25/$recsPerHour;
+    my $minTimeBetweenPeaks=99999999;
+    my $minPeakDuration=999999999;
+    my $maxPeakDuration=0;
+    my $npeaks=$#PEAKS+1;
+    my $lambda=$npeaks/$totalDuration;
+    foreach my $n (0..$npeaks-1){
+       $minPeakDuration=$Duration[$n] if ($Duration[$n] < $minPeakDuration);
+       $maxPeakDuration=$Duration[$n] if ($Duration[$n] > $maxPeakDuration);
+
+       if ($n < $npeaks-1){
+           my $dt=$PeakHours[$n+1]-$PeakHours[$n];
+           if ($dt < 0)  {
+           }
+ 
+           $minTimeBetweenPeaks=$dt if $dt < $minTimeBetweenPeaks;
+           
+
+       } 
+    }  
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#-------- Sanity Check on Peak Durations and Time Between Peaks--------#\n";
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "   Total Record Duration:  $totalDuration years\n";
+    print LOG "   Using POT method with Threshold:  $threshold; $npeaks peaks were found\n";  
+    print LOG "   Average Rate (lambda):  $lambda events/year\n";
+    print LOG "   Peaks with less than $minEventDuration hours between are consider a single event and merged\n";
+    my $minHrsBtwPeaks=$minTimeBetweenPeaks/$recsPerHour;
+    print LOG "   Minimum Time Between Peaks:  $minHrsBtwPeaks hours\n";
+    my $minDurHr=$minPeakDuration/$recsPerHour;
+    print LOG "   Minimun Peak Duration: $minDurHr hours\n";
+    my $maxDurHr=$maxPeakDuration/$recsPerHour;
+    print LOG "   Maximum Peak Duration: $maxDurHr hours\n";
+
+    print "#----------------------------------------------------------------------#\n";
+    print "#-------- Sanity Check on Peak Durations and Time Between Peaks--------#\n";
+    print "#----------------------------------------------------------------------#\n";
+    print "   Total Record Duration:  $totalDuration years\n";
+    print  "   Using POT method with Threshold:  $threshold; $npeaks peaks were found\n";  
+    print  "   Average Rate (lambda):  $lambda events/year\n";
+    print  "   Peaks with less than $minEventDuration hours between are consider a single event and merged\n";
+    print  "   Minimum Time Between Peaks:  $minHrsBtwPeaks hours\n";
+    print  "   Minimun Peak Duration: $minDurHr hours\n";
+    print  "   Maximum Peak Duration: $maxDurHr hours\n";
+
+
+
+
+    # sort the data and write the orders statistics 
+    my @sorted_i = sort {$PEAKS[$b] <=> $PEAKS[$a]} (0..$#PEAKS);
+
+               #123456789012345678901234567890123456789012345678901234567890123456789012
+    print LOG "#------------------------------- Rank Ordered Peak Values ------------------------------------#\n";
+    print LOG "Rank, $product ($units),  Time of Peak ,     Upcross Time ,   Downcross Time , Duration\n";
+
+    my $rank=1;
+    foreach my $i (@sorted_i){
+       my $str=$PeakTimes[$i];
+       $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+       my $t = "$1-$2-$3 $4:$5";
+   
+       $str=$T[$UpCrosses[$i]];
+       $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+       my $uc="$1-$2-$3 $4:$5";
+   
+       $str=$T[$DownCrosses[$i]];
+       $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
+       my $dc="$1-$2-$3 $4:$5";
+  
+       $str=sprintf("%4d,%9.3f,  %16s,  %16s,  %16s,%9.1f",$rank,$PEAKS[$i],$t,$uc,$dc,$Duration[$i]);
+       print LOG "$str\n";
+       #print OUT "$rank,$PEAKS[$i],$t,$uc,$dc,$Duration[$i],$DIR_atPeak[$i],$TP_atPeak[$i];\n";
+       $rank++; 
+    }
+    my @Ordered=@PEAKS[@sorted_i];
+    close (LOG);
+
+    return (\@Ordered,$lambda,$logFile);
+
+} # end NOAA_gauge_POT
+
+
+
+#############################################################
+# sub NOAA_gauge_AnnualMax
+# 
+# e.g. NOAA_gauge_AnnualMax(
+#                     -STATIONID => $stationID,    # NOAA station ID number
+#                     -BEGINDATE => $beginDate,    # yyyymmdd
+#                     -ENDDATE   => $endDate,      # yyyymmdd
+#                     -PRODUCT   => $product,      # e.g. hourly_height, water_level, wind  
+#                     -DATUM     => $datum,        # e.g. MHHW,MHW,DTL,MTL,MSL,MLW,MLLW,GT,MN,DHQ,DLQ,NAVD
+#                     -UNITS     => $units,        # e.g. metric or english
+#                     -LOGFILE   => $logFile,      # optional name of logfile
+#                     -RECORDFREQ => $recsPerHour, # e.g. 10 for 6 minute "water_level",  1 for hourly_height
+#                     -COOPSFILE => $coopsFile     # optional name of file downloaded with getCOOPS.pl with time series data
+#                   )                              # specify this if you have already dowlnoaded the data from CO-OPS 
+#
+
+sub NOAA_gauge_AnnualMax{
+    my %args=@_;
+    my $stationID=$args{-STATIONID};
+    my $beginDate=$args{-BEGINDATE};
+    my $endDate = $args{-ENDDATE};
+    my $product = $args{-PRODUCT};
+    my $datum   = $args{-DATUM};
+    my $units   = $args{-UNITS};
+    my $fracNeed=0.80;  # need at least this much fraction of a year for it to be counted 
+    $fracNeed=$args{-FRACNEED} if defined ($args{-FRACNEED});
+    my $logFile="station-$stationID-begin-$beginDate-end-$endDate-$product-$units-$datum-AnnualMax_stats.log";
+    $logFile=$args{-LOGFILE} if defined ($args{-LOGFILE});
+    my $recsPerHour=1;
+    $recsPerHour=10 if ($product =~ m/water_level/i); 
+    $recsPerHour=$args{-RECORDFREQ} if defined ($args{-RECORDFREQ});
+    my $coopsFile= 0;
+    $coopsFile = $args{-COOPSFILE} if defined ($args{-COOPSFILE});
+
+  
+    open LOG, ">>$logFile" or die "ERROR:  GodaXtreme.pm:  fitWISoneLine:  cant open logfile $logFile for writing\n";
+              #         1         2         3         4         5         6         7
+              #123456789012345678901234567890123456789012345678901234567890123456789012
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#--------- Statistical Analysis of Extreme $product --------------#\n";
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG '  Reference:  Yoshimi Goda, 2010, "Random Seas and Design of Maritime ',"\n";
+    print LOG "              Structures\", 3rd edition. Chapter 13.                   \n";  
+    print LOG "#                                                                      #\n";
+    print LOG "#----------------------------------------------------------------------#\n";
+    print LOG "#                                                                      #\n";
+          #123456789012345678901234567890123456789012345678901234567890123456789012
+    print "\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#--------- Statistical Analysis of Extreme $product ---------------#\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  '  Reference:  Yoshimi Goda, 2010, "Random Seas and Design of Maritime ',"\n";
+    print  "              Structures\", 3rd edition. Chapter 13.                   \n";  
+    print  "#                                                                      #\n";
+    print  "#----------------------------------------------------------------------#\n";
+    print  "#                                                                      #\n";
+     
+    # get the COOPS data if we don't have it already
+    unless ($coopsFile){
+       $coopsFile="$stationID-$product-$datum-$units-$beginDate-$endDate".'.csv';
+       my $cmdstr="perl getCoopsdata.pl --station $stationID --begin $beginDate --end $endDate --product $product --datum $datum --units $units --timezone GMT --format CSV --outfile $coopsFile";
+       print "Getting COOPS data with command: $cmdstr\n";
+       system($cmdstr);
+    }
+    
+    # ingest the COOPS data
+    # record the max from each year
+    # count the number of records in each year
+    open IN, "<$coopsFile" or die "Cant open $coopsFile";
+    <IN>; #skip headerline
+    my %WSE;
+    my %NRECS;
+    my %PEAK_TIME;
+    while(<IN>){
+       next unless ( $_ =~ m/(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d),(.+?),/);
+       my $yyyy=$1;
+       my $mm=$2;
+       my $dd=$3;
+       my $HH=$4;
+       my $MM=$5;
+       my $wse=$6;
+       if (defined $WSE{$yyyy}){
+           if ($wse > $WSE{$yyyy}){
+              $WSE{$yyyy}=$wse;
+              $PEAK_TIME{$yyyy}="$yyyy-$mm-$dd $HH:$MM";
+           }
+           $NRECS{$yyyy}++;
+       }else{
+           $WSE{$yyyy}=$wse;
+           $PEAK_TIME{$yyyy}="$yyyy-$mm-$dd $HH:$MM";
+           $NRECS{$yyyy}=1;
+       }
+    }
+    close(IN);
+  
+    # figure out the years that have enough data
+    my %FRACHAVE;
+    my $recsPerYear=$recsPerHour*24*365;
+   
+    foreach my $yyyy (keys %WSE){
+        $FRACHAVE{$yyyy}=$NRECS{$yyyy}/$recsPerYear;
+    }    
+
+
+    my @YRS=();
+    my @PEAKS=();
+    foreach my $yyyy (keys %WSE){
+       if ($FRACHAVE{$yyyy} >= $fracNeed){
+          push @YRS,$yyyy;
+          push @PEAKS,$WSE{$yyyy};
+       }
+    }
+    my $nyears=$#YRS+1;
+
+
+    # sort the data and write the orders statistics 
+    my @sorted_i = sort {$PEAKS[$b] <=> $PEAKS[$a]} (0..$#PEAKS);
+
+               #123456789012345678901234567890123456789012345678901234567890123456789012
+    print LOG "#---------------------------- Rank Ordered Annual Maximums ---------------------------------#\n";
+    my $daysNeed=365*$fracNeed;
+    print LOG "-FRACNEED = $fracNeed;  Only including years that have at least $daysNeed days of records\n";
+    print LOG "Rank, $product ($units),  year, days counted, peak datetime\n";
+
+    my $rank=1;
+    foreach my $i (@sorted_i){  
+       my $daysCounted=365*$FRACHAVE{$YRS[$i]};
+       my $str=sprintf("%4d,              %7.2f   ,  %4d,     %6.1f,   %s",$rank,$PEAKS[$i],$YRS[$i],$daysCounted,$PEAK_TIME{$YRS[$i]});
+       print LOG "$str\n";
+       $rank++; 
+    }
+    my @Ordered=@PEAKS[@sorted_i];
+    close (LOG);
+    my $lambda=1; # for annual max data
+
+    return (\@Ordered,$lambda,$logFile);
+
+} # end NOAA_gauge_AnnualMax
+
+
+
+
+
+
+
+
 
 
 ###############################################################
@@ -937,34 +1519,34 @@ sub fitDistributions{
     }
 
     unless ($NOLOG){
-      print LOG "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-      print LOG "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print LOG "#-------------------------------------------------------------------------------------------------------------#\n";
+      print LOG "#---------------------------------------  Results Summary  ---------------------------------------------------#\n";
       print LOG "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
-      print "#-----------------------------------------------------------------------------------------------------------------------------#\n";
-      print "#----------------------------------------------------  Results Summary  ------------------------------------------------------#\n";
+      print "#-------------------------------------------------------------------------------------------------------------#\n";
+      print "#---------------------------------------  Results Summary  ---------------------------------------------------#\n";
       print "  threshold = $threshold,  number of samples = $N,  annual rate =  $lambda, censoring parameter =  $nu\n";  
     }
     # sort by best fit and write results
     my @Sorted = sort {$MIR[$a] <=> $MIR[$b]} (0..$#MIR);
     my $str='';
     foreach my $rp (@RP){
-       $str.=sprintf("| %5d-yr ",$rp);
+       $str.=sprintf("|%5d-yr ",$rp);
     } 
     unless ($NOLOG){
-      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-      print LOG "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-      print LOG "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
-      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|------------ RETURN VALUES ----------------#\n";
-      print "# Dist type |   k   |   r^2   |   MIR   |   DOL   |   REC   |  Slope  | Intercept $str#\n";
-      print "#-----------|-------|---------|---------|---------|---------|---------|-----------|----------|----------|----------|----------#\n";
+      print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
+      print LOG "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
+      print "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
+      print "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
     }
     foreach my $i (@Sorted){
          my @RV_=@{$RV[$i]};
          my $str='';
          foreach my $rv (@RV_){
-              $str.=sprintf("| %8.2f ",$rv);
+              $str.=sprintf("|%8.2f ",$rv);
          }
-          my $str2=sprintf("| %8s  | %5.2f | %7.3f | %7.3f | %7s | %7s | %7.3f | %7.3f   $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
+          my $str2=sprintf("|%8s | %5.2f |%6.3f |%6.3f |%7s |%7s |%6.3f |%6.3f  $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
          print LOG "$str2\n" unless ($NOLOG);
          print "$str2\n" unless ($NOLOG);
 
