@@ -1431,6 +1431,9 @@ sub NOAA_gauge_AnnualMax{
 sub fitDistributions{
     my ($oref,$rpRef,$lambda,$nu,$logFile,$threshold)=@_;
     my @Ordered=@{$oref};
+    # sort Ordered in case it is not already
+    my @sorted = sort {$b <=> $a} (@Ordered);
+    @Ordered=@sorted;
     $threshold = $Ordered[$#Ordered] unless ( defined $threshold);
     my $N=$#Ordered+1;
     my @RP = @{$rpRef};     # return periods that you want values for
