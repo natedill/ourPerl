@@ -1346,6 +1346,47 @@ sub getSpatialDataByIjAllRecsAllFields {
  
    return \@FIELDNAMES,\@IDDs,\@DATA;
 }
+#########################################################################   
+# get spatial grid data by cell values - ALL RECORDS All Fields
+#
+# e.g. my ($fieldNames,$idds,$data) = $stw->getSpatialDataByCellAllRecsAllFields("DEP",$cellNum);
+#
+# returns array reference 
+# 
+#########################################################################   
+sub getSpatialDataByCellAllRecsAllFields {
+   my $obj=shift;
+   my ($dataName,$cellNum)=@_;
+   $dataName=lc($dataName);
+   my $ni=$obj->{$dataName}->{datadims}->{ni};
+   my $nj=$obj->{$dataName}->{datadims}->{nj};
+
+   # if i,j is outside the domain get the closest cell
+   $cellNum=$ni*$nj if ($cellNum > $ni*$nj);
+  
+   #my $cellNum=($i-1)+$ni*($nj-$j) + $ni*$nj*($rec-1);
+   # get all field names
+   my @FIELDNAMES=@{$obj->{$dataName}->{fieldNames}};
+   # get IDDs
+   my @IDDs= @{$obj->{$dataName}->{idds}};
+   # get number of records
+   my $numRecs=$obj->{$dataName}->{datadims}->{numrecs};
+  
+   my @DATA=();
+   foreach my $fieldName (@FIELDNAMES){
+      my @THISFIELD=();
+      my $cellNum1=$cellNum;
+      foreach my $rec (1..$numRecs){
+          my $val = unpack ("d",substr($obj->{$dataName}->{$fieldName},$cellNum1*8,8));
+          push @THISFIELD,$val;
+          $cellNum1=$cellNum1 + $ni*$nj;
+      }
+      push @DATA,\@THISFIELD;
+   }
+
+ 
+   return \@FIELDNAMES,\@IDDs,\@DATA;
+}
 
 
 #########################################################################   
