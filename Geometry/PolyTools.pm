@@ -263,6 +263,7 @@ sub readKmlPlacemarks_2{
 
       push @PMs, \%pm;
   }
+  pop @PMs;  # remove the junk from after the last tag
   return \@PMs;
 }
 
