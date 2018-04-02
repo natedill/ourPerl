@@ -1676,4 +1676,243 @@ sub getGridBounds{
 
 
 
+
+###############################################################################
+# sub depressionFiller
+#
+# have to run genNeighborTables before this one
+#
+# e.g.  $filledDP=$adcGrid->depressionFiller($drainDp,$eps,$dontFillPx,$dontFillPy);
+#
+#    $nt is a ref to the node neibhbor array
+#    $dranDP is the DP above which you want to apply the filler
+#    $eps is the minimum change in elevation (e.g. use zero for flat fill arrows, > 0 for some gradient everhwhere
+#    $dontFillPx,$dontFillPy are refs to arrays that descryb the x,y points of a polygon
+#    you dont want filled
+#
+#    $filledDP is a reference to an array of new DP values.  this function doesn't
+#    automatically update the xyz data in the object, so use setNode first if you want
+#    to write out a grid file with new falues
+###############################################################################
+sub depressionFiller{
+   my $obj=shift;
+   my ($drainDP,$eps,$px,$py)=@_;
+
+   my $np=$obj->{NP};
+
+   my ($x,$y,$dpref) = $obj->getNode([0..$np]);  # DP has junk at [0]
+   my @DP=@{$dpref};
+
+   # get the node  neighbor table or generate if not done yet
+   my $nt=$obj->{NODENEIGHBORS};
+   unless (defined $nt){
+      print "INFO: AdcGrid.pm: depressionFiller: need to generate node neighbor table\n";
+      $obj->genNeighborTables();
+      $nt=$obj->{NODENEIGHBORS};
+   }
+   my @NT=@{$nt};
+
+   # fill single node depressions and peaks everywhere
+   my @DP_=@DP;
+   foreach my $n (1..$np){
+      my $maxNeighborDp=-999999999;
+      my $minNeighborDp=99999999;
+      foreach my $nei (@{$NT[$n]}){
+         $maxNeighborDp=$DP[$nei] if $DP[$nei] > $maxNeighborDp;
+         $minNeighborDp=$DP[$nei] if $DP[$nei] < $minNeighborDp;
+      }
+      $DP_[$n]=$maxNeighborDp if $DP[$n] > $maxNeighborDp;
+      $DP_[$n]=$minNeighborDp if $DP[$n] < $minNeighborDp;
+   }
+   @DP=@DP_;
+
+   # set initial water level and elevation
+   my @WSE=();
+   my @Z=();
+   my @VISITED=();
+   foreach my $dp (@DP){
+      push @WSE, 99999;
+      push @Z, -$dp;
+      push @VISITED, 0;
+   }
+
+
+   # set the drains
+   #   my ($px,$py);
+   #   if (defined $dontFillPoly){
+   #     ($px,$py)=PolyTools::readKmlPoly($dontFillPoly);
+   #   }
+   foreach my $n (1..$np){
+    
+      $WSE[$n]=$Z[$n] if $Z[$n] < -$drainDP;
+      if (defined $py){
+         my $inPoly=pointInPoly($x->[$n],$y->[$n],$px,$py);
+         $WSE[$n]=$Z[$n] if $inPoly;
+      }
+   }
+
+   my $changed=1;
+   my $iter=0;
+   my $recursDepth=0;
+
+   while ($changed){
+      $changed=0;
+      $iter++;
+      print "iteration $iter\n";
+  
+      foreach my $n (1..$np){
+      #  print "iter $iter, node $n\n";
+         next unless $WSE[$n] > $Z[$n];
+      
+         foreach my $nei (@{$NT[$n]}){
+
+            if ($Z[$n] >= $WSE[$nei] + $eps){
+                $WSE[$n]=$Z[$n];
+                $changed=1;
+                _dryUpwardCell(\@WSE,\@Z,$eps,$n,\@NT,$recursDepth);
+                next;
+            }
+            if ($WSE[$n] > $WSE[$nei] + $eps){
+                $WSE[$n] = $WSE[$nei] + $eps;
+                $changed=1;
+            }
+          }
+      }
+   }
+
+   # set the unset values back to the original
+   #foreach my $n (1..$np){
+   #   $WSE[$n]=$Z[$n] if ($WSE[$n] == 99999);
+   #}
+   # write some output showing the changes
+   open F63, ">DepressionsFilled.63\n";
+   print F63 "rundes runid agrid\n";
+   print F63 " 3 $np 1. 1 1\n";
+   # the original
+   print F63 "1. 1\n";
+   foreach my $n (1..$np){
+      print F63 "$n $Z[$n]\n";
+   }
+   # the new z
+   print F63 "2. 2\n";
+   foreach my $n (1..$np){
+      print F63 "$n $WSE[$n]\n";
+   }
+   # the difference
+   print F63 "3. 3\n";
+   foreach my $n (1..$np){
+      my $df = $WSE[$n] - $Z[$n];
+      print F63 "$n $df\n";
+   }
+   close(F63);
+   # set the unset values back to the original
+   #foreach my $n (1..$np){
+   #   $WSE[$n]=$Z[$n] if ($WSE[$n] == 99999); 
+   #}
+   # set the depth and write the modified grid file
+   #foreach my $n (1..$np){
+     # $DP[$n]=-$WSE[$n];
+   #}
+   #$adcGrid->setNode([0..$np],$x,$y,\@DP);
+   #check the weirheights
+   #$adcGrid->checkWeirheights(0.15);
+   # add to the AGRID to indicate filled
+   #$adcGrid->{AGRID} .= " filled eps=$eps";
+   #$adcGrid->write14($filledGrid);
+   return \@WSE;
+}
+
+#################################################
+# recursive subroutine to "dry" uphill nodes
+# private sub that works with depressionFiller
+sub _dryUpwardCell{
+  my ($wse,$z,$eps,$n,$neitab,$recursDepth)=@_;
+  $recursDepth++;
+  if ($recursDepth > 999) {
+    print "exceeded 99 recursions\n";
+    return
+  }
+  foreach my $nei (@{$neitab->[$n]}){
+    next if $wse->[$nei] < 99999;
+    if ($z->[$nei] > $wse->[$n] + $eps ){
+       $wse->[$nei]=$z->[$nei];
+       &_dryUpwardCell($wse,$z,$eps,$nei,$neitab,$recursDepth);
+    }
+  }
+}
+
+
+###########################################################
+#  sub findDownhillProxies($drainDP)
+#
+#  this sub first fills depressions in the grid, then for
+#  nodes that are above $drainDP, it will find list of nodes
+#  following the steepest decent, that lead to water
+#
+#  the idea is that water levels from the proxy nodes can 
+#  be used at dry nodes to provide approximate values
+#  for statistic calculations, etc.  Also can be used
+#  to project wave heights onto land while depth limiting
+#  them.
+#
+#  returns a ref to an array or refs which contain the 
+#  proxy list for each node.  the array is undef for nodes
+#  above the drainDP.
+#
+sub findDownhillProxies{
+    my $obj=shift;
+    my $drainDP=shift;
+    $drainDP=0 unless defined ($drainDP);
+    my $eps=0.0001;
+
+
+    my $np=$obj->{NP};
+ 
+    print "INFO: AdcGrid.pm : findDownhillProxies:  filing depressions\n";
+
+    my $filled=$obj->depressionFiller($drainDP,$eps);
+    my @FILLED=@{$filled};
+
+    my @NT=@{$obj->{NODENEIGHBORS}};
+
+    print "INFO: AdcGrid.pm : findDownhillProxies:  getting DP\n";
+  
+    my ($xref,$yref,$dpref) = $obj->getNode([0..$np]);  # DP has junk at [0]
+    my @DP=@{$dpref};
+
+    my @PROXIES;
+    push @PROXIES,'0';  # junk at zero
+    foreach my $n (1..$np){
+        next if $DP[$n] >=$drainDP;
+        my $knt=0;
+        my $nn=$n;
+        my @proxies=();
+        while (1){
+             my @NEI=@{$NT[$nn]};
+             my @dps=@DP[@NEI];
+             my @INDX = sort { $dps[$b] <=> $dps[$a] } 0..$#dps;
+             my $prox=$NEI[$INDX[0]];
+             push @proxies,$prox;
+             last if $dps[$INDX[0]] >=$drainDP;
+             $knt++; 
+             die "who knt is $knt and didn't find a proxy\n" if $knt > 9999;
+             $nn=$prox;
+        }
+       #print "node $n PROXIES: @proxies\n";
+        push @PROXIES, \@proxies;
+    } 
+            
+    return \@PROXIES;
+}    
+            
+    
+
+
+
+
+
+
+
+
+
 1;
