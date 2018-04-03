@@ -1692,7 +1692,7 @@ sub getGridBounds{
 #
 #    $filledDP is a reference to an array of new DP values.  this function doesn't
 #    automatically update the xyz data in the object, so use setNode first if you want
-#    to write out a grid file with new falues
+#    to write out a grid file with new falues.  the returned array is 1-indexed (i.e. there is garbage at [0])
 ###############################################################################
 sub depressionFiller{
    my $obj=shift;
@@ -1728,6 +1728,7 @@ sub depressionFiller{
 
    # set initial water level and elevation
    my @WSE=();
+   $WSE[0]=0;
    my @Z=();
    my @VISITED=();
    foreach my $dp (@DP){
@@ -1819,7 +1820,17 @@ sub depressionFiller{
    # add to the AGRID to indicate filled
    #$adcGrid->{AGRID} .= " filled eps=$eps";
    #$adcGrid->write14($filledGrid);
-   return \@WSE;
+   
+
+   #reverse WSE so we can return filled DP
+   foreach my $n (1..$np){
+       $WSE[$n]= -1*$WSE[$n];
+   }
+
+   return \@WSE;  # WSE has junk at [0]
+
+
+
 }
 
 #################################################
@@ -1857,13 +1868,13 @@ sub _dryUpwardCell{
 #
 #  returns a ref to an array or refs which contain the 
 #  proxy list for each node.  the array is undef for nodes
-#  above the drainDP.
+#  above the drainDP.  It is also undef at [0]. 
 #
 sub findDownhillProxies{
     my $obj=shift;
     my $drainDP=shift;
     $drainDP=0 unless defined ($drainDP);
-    my $eps=0.0001;
+    my $eps=0.000001;
 
 
     my $np=$obj->{NP};
@@ -1871,7 +1882,7 @@ sub findDownhillProxies{
     print "INFO: AdcGrid.pm : findDownhillProxies:  filing depressions\n";
 
     my $filled=$obj->depressionFiller($drainDP,$eps);
-    my @FILLED=@{$filled};
+    my @FILLED=@{$filled};  
 
     my @NT=@{$obj->{NODENEIGHBORS}};
 
@@ -1881,21 +1892,25 @@ sub findDownhillProxies{
     my @DP=@{$dpref};
 
     my @PROXIES;
-    push @PROXIES,'0';  # junk at zero
+    push @PROXIES,[];  # junk at zero
     foreach my $n (1..$np){
-        next if $DP[$n] >=$drainDP;
+        if ($DP[$n] >=$drainDP){
+             push @PROXIES,[];
+             next;
+        }
         my $knt=0;
         my $nn=$n;
         my @proxies=();
         while (1){
              my @NEI=@{$NT[$nn]};
              my @dps=@DP[@NEI];
-             my @INDX = sort { $dps[$b] <=> $dps[$a] } 0..$#dps;
+             my @fill=@FILLED[@NEI];
+             my @INDX = sort { $fill[$b] <=> $fill[$a] } 0..$#fill;
              my $prox=$NEI[$INDX[0]];
              push @proxies,$prox;
-             last if $dps[$INDX[0]] >=$drainDP;
+             last if $fill[$INDX[0]] >= $drainDP;
              $knt++; 
-             die "who knt is $knt and didn't find a proxy\n" if $knt > 9999;
+             die "whoaa knt is $knt and didn't find a proxy\n" if $knt > 9999;
              $nn=$prox;
         }
        #print "node $n PROXIES: @proxies\n";
