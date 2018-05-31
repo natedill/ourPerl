@@ -405,5 +405,66 @@ sub bilinear{
 
 
 
+#################################################
+#  sub interp1_noNAN
+#
+#  e.g. 
+# 
+#   $Y2_ref = interp1_noNAN (\@X1,\@Y1,\@X2);
+#  
+#   @Y2=@{$Y2_ref};
+#
+# 
+#
+#  like matlab's interp1...
+#
+#  but this one extrapolates outside the bounds
+#
+################################################
+sub interp1_noNAN {
+    my ($x1r,$y1r,$x2r)=@_;
+    my @X1=@$x1r;
+    my @Y1=@$y1r;
+    my @X2=@$x2r;
+
+    my @Y2;
+
+    # loop through the new x locations
+    foreach my $x (@X2) {
+       
+      # if its out of bounds return a NaN
+      if ( $x > $X1[$#X1] ) {
+          my $slope = ($Y1[$#X1] -  $Y1[$#X1-1]) / ($X1[$#X1] -  $X1[$#X1-1]);  # its on the segment, interpolate
+          my $dx=$x-$X1[$#X1];
+          my $y=$Y1[$#X1] + $dx * $slope;
+          push (@Y2, $y);
+          next;
+      }
+
+      
+      foreach my $i (0..$#X1-1){
+          
+          if ($x == $X1[$i]) {       # its right on the first point in the segment
+             push (@Y2,$Y1[$i]);
+             last;
+          }
+         
+          next if ($x > $X1[$i+1]);  # its past this segment
+
+          my $slope = ($Y1[$i+1] -  $Y1[$i]) / ($X1[$i+1] -  $X1[$i]);  # its on the segment, interpolate
+          my $dx=$x-$X1[$i];
+          my $y=$Y1[$i] + $dx * $slope;
+          push (@Y2, $y);
+          last;  # go to the next point. 
+      }
+   }
+   
+   return (\@Y2); 
+       
+}
+
+
+
+
 
 1;

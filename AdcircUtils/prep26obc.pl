@@ -6,7 +6,14 @@
 #
 # usage: (run in root directory of simulation after running adcprep)
 #
-# perl prep26obc.pl --np 36 --fort319 fort.319
+# perl prep26obc.pl --np 36 --fort319 fort.319  --prepVersion 53
+#
+# --fort319 and --prepVersion are optional. default values are
+# fort.319 and 53, respectively
+#
+# --prepVersion >= 54 will assume that adcprep has not renumbered the
+# global node numbers to local node numbers (i.e. it ignores the fort.18)
+# this should be used for ADCIRC version 54 or greater. 
 #
 # You must include a line in your fort.26 file that starts with the string 
 # '$%%BOUNDSPEC%%' (without the quotes) where the swan boundary 
@@ -72,7 +79,7 @@ my $boundShapespec='BOUnd SHAPespec MEAN DSPR DEGRees';
 use strict;
 use warnings;
 
-use lib '/home/nate/ourPerl';
+use lib '/home/ycme/ourPerl';
 use AdcircUtils::AdcGrid;
 use Getopt::Long;
 
@@ -81,11 +88,13 @@ my $fort319='fort.319';
 my $fort26out="fort.26";
 my $np=1;
 my $fulldomain14='fort.14';
+my $prepVersion=53;
 
 # get the command line options
 GetOptions ( "np=i" => \$np,
              "fort319=s" => \$fort319,
-             "fulldomain14=s" => \$fulldomain14
+             "fulldomain14=s" => \$fulldomain14,
+             "prepversion=i" => \$prepVersion
            );
 #----------------------------------------------------------------
 # get the global node numbers for the open boundary nodes
@@ -133,7 +142,6 @@ print "INFO: prep26obc.pl: IN SUBDOMAIN $pe\n";
    my $fort14="$pedir".'fort.14';
    my $adcGrid=AdcGrid->new();
    $adcGrid->loadGrid($fort14);
-
    # how many open boundaries are there?
    my $nope=$adcGrid->getNOPE();
    next if ($nope==0);
@@ -156,7 +164,6 @@ print "INFO: prep26obc.pl: IN SUBDOMAIN $pe\n";
           push (@Y,$y);
       }
    }
-
    # calculate the LENgth along the boundary
    my @LEN=();
    my $len=0;
@@ -168,7 +175,7 @@ print "INFO: prep26obc.pl: IN SUBDOMAIN $pe\n";
 
    # read the fort.18 and get a table of local to global node ids
    my @L2G=();
-   if ($np==1){
+   if ($np==1 or $prepVersion >= 54){
       foreach my $nid (@GNIDS){
          $L2G[$nid]=$nid;
       }
@@ -207,7 +214,8 @@ print "INFO: prep26obc.pl: IN SUBDOMAIN $pe\n";
    $fort26str .= "BOUndspec SIDE 1 CCW VARiable FILE &\n";
    foreach my $l (@LEN){
      my $lnid=shift(@NIDS); push @NIDS,$lnid;
-     my $gnid=$L2G[$lnid];
+     my $gnid=$lnid;
+     $gnid=$L2G[$lnid] if $prepVersion < 54;
      if ($l < $LEN[$#LEN]){
         $fort26str .= "   $l \'TPAR-$gnid\' 1 &\n";
      }else{

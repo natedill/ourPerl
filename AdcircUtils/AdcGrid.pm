@@ -175,22 +175,24 @@ sub loadGrid{
    my $cnt=1;
    my $jn='';  # these are binary strings stored using pack
    my $xyz='1234567890122345678901234';
+   my %JN;
 
    foreach my $k (1..$Np){
       $line = readCleanLine($fh);  
       @data = split(/\s+/,$line); # split on whitespace
       
       my $j=shift(@data); # this should be the node number
-      unless ($j==$k){
-         print "WARNING: AdcGrid.pm: non-consecutive node number at node $k\n";
-      }
+    #  unless ($j==$k){
+    #     print "WARNING: AdcGrid.pm: non-consecutive node number at node $k\n";
+    #  }
       my $packed=pack("d3",$data[0],$data[1],$data[2]); # should be 24 bytes ling
       my $lenPac=length($packed);
-      my $offset=$j*24; # there will be nothing valuable at offset 0
+    #  my $offset=$j*24; # there will be nothing valuable at offset 0
+      my $offset=$k*24; # there will be nothing valuable at offset 0
       substr ($xyz,$offset,24,$packed); 
       #$xyz .= $packed;
-      $jn .= pack("l",$j); # should be 24 bytes long
-
+    #  $jn .= pack("l",$j); # 
+      $JN{$j}=$k;
       # figure grid limits box
 
       $maxx=$data[0] if ($data[0] > $maxx);
@@ -204,7 +206,7 @@ sub loadGrid{
 
    }
    $obj->{XYZ}=$xyz;
-   $obj->{JN}=$jn;
+   $obj->{JN}=\%JN;
 
    $obj->{MAX_X}=$maxx;
    $obj->{MAX_Y}=$maxy;
@@ -393,7 +395,8 @@ sub getNode
        my @Z;
        foreach $nid (@NIDS){
 	       # print "getting nid $nid\n";
-          my $jn=unpack("l", substr($obj->{JN},($nid-1)*4,4) );
+          #my $jn=unpack("l", substr($obj->{JN},($nid-1)*4,4) );
+          my $jn=$obj->{JN}->{$nid};
           my ($x, $y, $z)=unpack("d3", substr($obj->{XYZ},$jn*24,24) );
 	  push (@X,$x);
 	  push (@Y,$y);
@@ -402,7 +405,8 @@ sub getNode
        return (\@X,\@Y,\@Z);
     }else{
 	    # print "getting nid $nid\n";
-        my $jn=unpack("l", substr($obj->{JN},($nid-1)*4,4) );
+      # my $jn=unpack("l", substr($obj->{JN},($nid-1)*4,4) );
+        my $jn=$obj->{JN}->{$nid};
         my ($x, $y, $z)=unpack("d3", substr($obj->{XYZ},$jn*24,24) );
         return ($x, $y, $z);
     }
