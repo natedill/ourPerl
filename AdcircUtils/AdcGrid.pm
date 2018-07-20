@@ -1877,8 +1877,9 @@ sub _dryUpwardCell{
 sub findDownhillProxies{
     my $obj=shift;
     my $drainDP=shift;
+    my $eps=shift;
     $drainDP=0 unless defined ($drainDP);
-    my $eps=0.000001;
+    $eps=0.001 unless defined($eps);
 
 
     my $np=$obj->{NP};
