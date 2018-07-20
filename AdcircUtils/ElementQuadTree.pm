@@ -1090,7 +1090,7 @@ sub _writeKMLOverlay{
       print FILE "        <screenXY x=\"0.01\" y=\".99\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
       print FILE "        <rotationXY x=\"0\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
       #print FILE "        <size x=\".5333333\" y=\"0.1\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
-      print FILE "        <size x=\".6\" y=\"0.15\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+      print FILE "        <size x=\".9\" y=\"0.175\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
       print FILE "     </ScreenOverlay>\n";
       print FILE "   </Folder>\n";
    }
