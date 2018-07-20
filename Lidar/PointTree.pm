@@ -2672,7 +2672,7 @@ sub _getLeafIndex{
 	    foreach  my $child ( @{$obj->{CHILDREN}[$index]} ) {  # loop through the children decrementing points
 		    $obj->_getLeafIndex($x,$y,$recurseDepth,$child)
             }
-	    unless ($obj->{POINTCOUNTED}=1) { # we're here if the point is in a leaf node that doesn't have any points, 
+	    unless ($obj->{POINTCOUNTED}==1) { # we're here if the point is in a leaf node that doesn't have any points, 
                   $obj->{LASTINDX}=-2;
 		  return;
 	   }
