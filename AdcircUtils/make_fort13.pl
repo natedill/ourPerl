@@ -92,10 +92,10 @@ use Geometry::PolyTools;
 # set to 1 (true) if you want them, zero (false) otherwise
 
 my $mannings_n_at_sea_floor = 1; 
-my $surface_canopy_coefficient = 1;
-my $surface_directional_effective_roughness_length = 1; 
+my $surface_canopy_coefficient = 0;
+my $surface_directional_effective_roughness_length = 0; 
 my $surface_submergence_state = 0; 
-my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 1;
+my $average_horizontal_eddy_viscosity_in_sea_water_wrt_depth  = 0;
 my $primitive_weighting_in_continuity_equation = 1;
 my $elemental_slope_limiter = 1;
 my $sea_surface_height_above_geoid = 0;
@@ -110,8 +110,8 @@ my $advection_state = 1;
 
 # ---------------  grid and nodal attribute file----------------------#
 
-my $gridFile="fort.14";  # ADCIRC grid file - this is input
-my $fort13="fort.13";    # nodal attribute file name - this is output
+my $gridFile="PenBay_v8.14";  # ADCIRC grid file - this is input
+my $fort13="PenBay_v8.13";    # nodal attribute file name - this is output
 
 
 # ---------------------land cover data files -------------------------#
@@ -147,7 +147,7 @@ my $flt_or_tif='tif';    # uncomment if geoTiff
 #my $flt_or_tif='flt';   # uncomment if gridFloat
 
 # needs to be defined but not used if using gridFloat format
-my $tifFile='me_2010_ccap_land_cover.tif';
+my $tifFile='C:\0_PROJECTS\151.06112-Islesboro\modeling\NodalAttributes\me_2010_ccap_land_cover.tif';
 
 # these need to be defined, but not used if using a geoTiff
 my $hdrFile=''; # grid float header file
@@ -158,7 +158,7 @@ my $prjFile=''; # not used at this point
 
 
 # --------------- Default Manning's ----------------------------------#
-my $ManningDefault=0.018;  # the ultimate default value
+my $ManningDefault=0.02;  # the ultimate default value
 
 
 # ------------ Depth based Manning's in specific polygons ------------#
@@ -192,6 +192,9 @@ my %ManningsByDepthPolygons;
 my %BinsForArea1=('9999999999:-999999999'  => 0.095959595,     # use constant for all values
                    'precedence' => 1                 );  # do take presedence over land cover
 
+my %BinsForArea1_=('9999999999:-999999999'  => 0.05,     # use constant for all values
+                   'precedence' => 1                 );  # do take presedence over land cover
+
 my %BinsForArea2=('9999999999:200'  => 0.01,  # applies 0.01 to depth >= 200 meters 
                   '200:50'          => 0.013,    # applies 0.013 to depth >= 50 and < 200 meters
                   '50:-3'         => 0.018,    # applies 0.18 to depth >= -3 meters < 50 
@@ -202,8 +205,8 @@ my %BinsForArea2=('9999999999:200'  => 0.01,  # applies 0.01 to depth >= 200 met
 
 
 #%ManningsByDepthPolygons= ( );
-%ManningsByDepthPolygons= ( 'mannings_area1.kml' => \%BinsForArea1);
-#                            'mannings_area2.kml' => \%BinsForArea2  );
+%ManningsByDepthPolygons= ( 'mannings_area1.kml' => \%BinsForArea1,
+                            'mannings_area2.kml' => \%BinsForArea1_  );
 
 
 # ------------------surface directional roughness length----------------#
@@ -727,10 +730,12 @@ foreach my $line (@OutLines){
 $adcGrid->setNodalAttributeValue('mannings_n_at_sea_floor',1,\@NNDF,\@VALS);
 
 # add vcanopy to the grid object
-print "setting Vcanopy\n";
-@defVal=1.0;
-$adcGrid->addNodalAttribute('surface_canopy_coefficient','na',1,\@defVal);
-$adcGrid->setNodalAttributeValue('surface_canopy_coefficient',1,\@VC_NDF,\@VC);
+if ($surface_canopy_coefficient){
+  print "setting Vcanopy\n";  
+  @defVal=1.0;
+  $adcGrid->addNodalAttribute('surface_canopy_coefficient','na',1,\@defVal);
+  $adcGrid->setNodalAttributeValue('surface_canopy_coefficient',1,\@VC_NDF,\@VC);
+} #end if surface canopy coef
 
 } # end if $mannings_n_at_sea_floor
 
@@ -1019,22 +1024,26 @@ $adcGrid->setNodalAttributeValue('advection_state',1,\@AdvectionState_Nids,\@Adv
 
 my @DS=();
 
+if ($average_horizontal_eddy_viscosity_in_sea_water_wrt_depth or
+    $primitive_weighting_in_continuity_equation){
+  # calculate minimum edge sizes
+  my $nt=$adcGrid->genNeighborTables;
+  my @NT=@{$nt};
+  my $n;
+  foreach $n (1..$np){
+     my @Neighs=@{$NT[$n]};
+     my $ds=99999999;
+     foreach my $nn (@Neighs){
+        my $ds_=&cppdist($X[$nn], $Y[$nn], $X[$n],$Y[$n]);
+        $ds=$ds_ if ($ds_ < $ds);
+     }
+     $DS[$n]=$ds;
+  }
+} # end if we need DS
+
 if ($average_horizontal_eddy_viscosity_in_sea_water_wrt_depth){
 print "processing Eddy Viscosity\n";
 
-# calculate minimum edge sizes
-my $nt=$adcGrid->genNeighborTables;
-my @NT=@{$nt};
-my $n;
-foreach $n (1..$np){
-   my @Neighs=@{$NT[$n]};
-   my $ds=99999999;
-   foreach my $nn (@Neighs){
-      my $ds_=&cppdist($X[$nn], $Y[$nn], $X[$n],$Y[$n]);
-      $ds=$ds_ if ($ds_ < $ds);
-   }
-   $DS[$n]=$ds;
-}
 
 my @EDDY=();
 my @EDDY_NIDS=();
