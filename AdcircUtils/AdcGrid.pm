@@ -452,6 +452,103 @@ sub getElement{
 
 
 #######################################################################
+# $adcGrid->getElementArea();
+# 
+# e.g. 
+#
+#    my ($area,$volume)=$adcGrid->getElementArea($eid,SLAM0,SFEA0);
+#
+#  or
+# 
+#    my ($area_ref,$volume_ref)=$adcGrid(\@EIDs);
+#
+#    volume is below grid datum
+#
+#    if SLAM0 (Lon) and SFEA0 (lat) are defined it is assumed grid is in geogrphic
+#    and metric  units are returned
+#    other wise metric units are assumed for both input and output
+#
+# 
+#######################################################################
+sub getElementArea{
+   my $obj=shift;
+   my $eid=shift;
+   my $slam0=shift;
+   my $sfea0=shift;
+
+   my $isScalar=0;
+   if (ref($eid) eq 'SCALAR'){
+      $isScalar=1;
+      $eid=[$eid];
+   }
+
+ 
+    my @EIDS=@{$eid};
+    my @N1;
+    my @N2;
+    my @N3;
+    foreach $eid (@EIDS){
+       my ($n1, $n2, $n3)=unpack("l3", substr($obj->{NM},$eid*12,12) );
+      # $n1=0 unless (defined $n1);
+      # $n2=0 unless (defined $n2);
+      # $n3=0 unless (defined $n3);
+       push (@N1,$n1);
+       push (@N2,$n2);
+       push (@N3,$n3);
+    }
+    my ($x1r,$y1r,$dp1r)=$obj->getNode(\@N1);
+    my ($x2r,$y2r,$dp2r)=$obj->getNode(\@N2);
+    my ($x3r,$y3r,$dp3r)=$obj->getNode(\@N3);
+
+    my @AREA=();
+    my @VOL=();
+    foreach my $n (0..$#EIDS){
+       my $x1=$x1r->[$n];
+       my $y1=$y1r->[$n];
+       my $dp1=$dp1r->[$n];
+       my $x2=$x2r->[$n];
+       my $y2=$y2r->[$n];
+       my $dp2=$dp2r->[$n];
+       my $x3=$x3r->[$n];
+       my $y3=$y3r->[$n];
+       my $dp3=$dp3r->[$n];
+   
+       my $dp=($dp1+$dp2+$dp3)/3.0;
+
+       # convert to meters if coords are geographic
+       if (defined $sfea0){
+
+           $slam0=$x1; $sfea0=$y1; # to be more precise
+
+           ($x1,$y1)= (0,0); #&cppd($x1,$y1,$slam0,$sfea0);
+           ($x2,$y2)=&cppd($x2,$y2,$slam0,$sfea0);
+           ($x3,$y3)=&cppd($x3,$y3,$slam0,$sfea0);
+       } 
+       # apply heron's formula
+       my $a=( ($x2-$x1)**2. + ($y2-$y1)**2. )**0.5;  # side lengths
+       my $b=( ($x3-$x1)**2. + ($y3-$y1)**2. )**0.5;
+       my $c=( ($x2-$x3)**2. + ($y2-$y3)**2. )**0.5;
+
+       my $s= ($a+$b+$c) / 2;   #half permiteter
+
+       my $area = ($s*($s-$a)*($s-$b)*($s-$c))**0.5;
+       push @AREA, $area;
+       push @VOL, $area*$dp;
+    }
+
+
+    if ($isScalar){
+        return ($AREA[0],$VOL[0]);
+    }else{
+        return (\@AREA,\@VOL);
+    }
+}
+
+
+
+
+
+#######################################################################
 # $adcGrid->getNOPE()
 #
 # method to get the number of open boundaries
@@ -1928,6 +2025,19 @@ sub findDownhillProxies{
     
 
 
+#cpp projection 
+sub cppd { #lon,lat,lon0,lat0  (in degrees)
+
+   my ($lon, $lat, $lon0, $lat0)=@_;  # get the arguments
+
+   my $R=6378206.4; #radius of Earth in meters
+   my $pi=3.14159265359;
+   my $radLat0=$lat0*$pi/180;
+   my $x=$R*($lon-$lon0)*cos($radLat0)*$pi/180.;
+   my $y=($lat-$lat0)*$R*$pi/180.;
+
+   return ($x,$y);
+}
 
 
 
