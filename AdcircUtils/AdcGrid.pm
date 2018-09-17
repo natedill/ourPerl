@@ -1509,6 +1509,8 @@ print " done making node_ele array\n";
     } # end loop over nodes
  
     $obj->{NODENEIGHBORS}=\@NodeNeighbors;
+    $obj->{NODE_ELE_TABLE}=\@NODE_ELE;
+    return (\@NodeNeighbors,\@NODE_ELE);
 
 } # end sub genNeighborTables
 

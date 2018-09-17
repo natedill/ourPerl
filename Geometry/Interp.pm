@@ -429,6 +429,28 @@ sub interp1_noNAN {
 
     my @Y2;
 
+    # check for non-monotonicity in X  (and try to remove it if possible)
+    foreach my $i (0..$#X1){
+        my $x1=shift @X1;
+        my $y1=shift @Y1;
+
+        if ($i == 0){
+           push @X1, $x1;
+           push @Y1, $y1;
+        }else{
+           if ($x1 > $X1[$#X1]){
+              push @X1, $x1;
+              push @Y1, $y1;
+           } 
+        }
+    }
+    unless ($#X1){
+        print "WARNING ! interp1_noNAN: couldn't remove non-monotonicity\n";
+        return undef;
+    }
+         
+        
+
     # loop through the new x locations
     foreach my $x (@X2) {
        

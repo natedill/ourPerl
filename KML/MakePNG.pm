@@ -426,13 +426,14 @@ sub interp1 {
 #
 #################################################################
 sub makeColorbar {
-   my ($pngName,$title,$numColors,$cmap,$cll,$cul) = @_;
+   my ($pngName,$title,$numColors,$cmap,$cll,$cul,$tickLabelFormatString) = @_;
      
    my $xpix=550;
    my $ypix=100;
    my $xMarg=15;
    my $yMarg=30;
    my $xWidth= ($xpix - 2*$xMarg);
+   $tickLabelFormatString='%.1f' unless ( defined ($tickLabelFormatString)); 
 
    my $im = new GD::Image($xpix,$ypix);
    my @colors = &setColors($im,@{$cmap},0);
@@ -493,7 +494,7 @@ sub makeColorbar {
               $im->setPixel($intx+1,$y,$black);
         } 
         my $dtmp = $cll + ($x - $xMarg)*$dClim/$xWidth;
-        my $tickLabel=sprintf("%.1f",$dtmp);
+        my $tickLabel=sprintf($tickLabelFormatString,$dtmp);
         $im->string(gdTinyFont,$x-11,$ytmp+6,$tickLabel,$black);
         $x=$x+$dx;
       } 
