@@ -192,9 +192,9 @@ sub makeKml4Overlay_wTimeSeriesPlot{
    print KML "           <href>$tsPngName</href>\n";
    print KML "        </Icon>\n";
    print KML "        <overlayXY x=\"1\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
-   print KML "        <screenXY x=\"0.95\" y=\".05\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+   print KML "        <screenXY x=\"0.99\" y=\".01\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
    print KML "        <rotationXY x=\"0\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
-   print KML "        <size x=\"0\" y=\"0.33\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
+   print KML "        <size x=\"0.7\" y=\"0\" xunits=\"fraction\" yunits=\"fraction\"/>\n";
    print KML "     </ScreenOverlay>\n";
 
 

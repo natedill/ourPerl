@@ -2024,7 +2024,17 @@ sub findDownhillProxies{
     return \@PROXIES;
 }    
             
-    
+   
+#######################################################################
+# sub load63
+#
+# load a fort.63 style file into binary strings
+#
+#
+#
+sub load63 {
+  
+} 
 
 
 #cpp projection 

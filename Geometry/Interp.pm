@@ -433,23 +433,23 @@ sub interp1_noNAN {
     foreach my $i (0..$#X1){
         my $x1=shift @X1;
         my $y1=shift @Y1;
-
-        if ($i == 0){
+        last unless $#X1;
+        unless($x1 == $X1[0]){
            push @X1, $x1;
            push @Y1, $y1;
-        }else{
-           if ($x1 > $X1[$#X1]){
-              push @X1, $x1;
-              push @Y1, $y1;
-           } 
-        }
+        } 
     }
     unless ($#X1){
         print "WARNING ! interp1_noNAN: couldn't remove non-monotonicity\n";
         return undef;
     }
-         
-        
+    # just check and warn if X is non-monotinic
+    foreach my $i (0..$#X1-1){
+       if ($X1[$i+1] <= $X1[$i]) {
+          print "WARNING! Interp1_noNANS: X is not monotonically increasing\n";
+          return undef;
+       }
+    }        
 
     # loop through the new x locations
     foreach my $x (@X2) {
@@ -463,7 +463,7 @@ sub interp1_noNAN {
           next;
       }
 
-      
+
       foreach my $i (0..$#X1-1){
           
           if ($x == $X1[$i]) {       # its right on the first point in the segment

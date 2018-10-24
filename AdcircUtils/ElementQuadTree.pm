@@ -1848,8 +1848,10 @@ sub _findElements {
 #
 #################################################################
 sub makeColorbar {
-   my ($self,$title) = @_;
+   my ($self,$title,$tickFormat) = @_;
      
+   $tickFormat="%.3g" unless (defined $tickFormat);
+
         my $numColors=13;  # the default	
    if (defined $self->{NUMCOLORS}) {
            $numColors=$self->{NUMCOLORS};
@@ -1948,7 +1950,7 @@ sub makeColorbar {
         
 #bpj        my $tickLabel=sprintf("%4.1f",$dtmp);
 #bpj added:
-        my $tickLabel=sprintf("%.3g",$dtmp);
+        my $tickLabel=sprintf($tickFormat,$dtmp);
 #        $im->string(gdMediumBoldFont,$x-5,$ytmp+6,$tickLabel,$black);:w
 
 # BPJ change x offset
