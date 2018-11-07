@@ -985,7 +985,7 @@ sub NOAA_gauge_POT{
        my $wse=shift(@WSE); push @WSE, $wse;
        my $t=shift(@T); push @T, $t;
        my $dh= $HR[0] - $hr;
-       if ( $dh > $dt0 ){
+       if ( $dh > 1.01*$dt0 ){
           my $dx=$dh/24;
           my $str=sprintf("%7.2f",$dx);
           print LOG "Missing data $str days between $t and $T[0]\n";
@@ -1062,7 +1062,7 @@ sub NOAA_gauge_POT{
                  push @Duration, $duration;
                  push @PeakHours, $peakHr;
                  $peakCount++;
-                 $str=sprintf("   %4d, %13s,%10d, %8d,  %4.2f",$peakCount,$peakT,$peakHr,$duration,$peakWse);
+                 $str=sprintf("   %4d, %13s,%10d, %8.1f,  %4.2f",$peakCount,$peakT,$peakHr,$duration,$peakWse);
                  #print LOG "peak $peakCount, time $peakT, record $hr, duration $duration, Hs= $peakHs, dir=$peakDIR, Tp=$peakTp \n";
                  print LOG "$str\n";
                  last;
