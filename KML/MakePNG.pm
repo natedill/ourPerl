@@ -56,6 +56,56 @@ sub raster {
 }
 
 
+
+
+
+sub raster_fade {
+   my ($pngFile,$xpix,$ypix,$numColors,$alpha,$cll,$cul,$cmapRef,$dataref)=@_;
+   my @data=@{$dataref};
+   
+   my @colors;
+   my $im = new GD::Image($xpix,$ypix);
+  
+   @colors = &setColors_fade($im,@{$cmapRef},$alpha);	
+   my $transparent=$colors[0];
+
+   $cul=$cll+1 if ($cul <= $cll);  # to avoid divide by zero down below if bad cul and cll were specified
+   my $dzdc=($cul-$cll)/127;
+
+   my $i;
+   my $j =  0;
+   my $cnt = 0;	
+   my $C=0;
+   while ($j<$ypix) {
+      $i=0;	
+      while ($i<$xpix) {
+            $C=$data[$cnt];
+            if (defined $C){
+               $C=($C-$cll)/$dzdc +1;
+               $C= int((int($numColors*($C-1)/128)+0.5 )*128/$numColors);
+               $C=128 if ($C > 128); 
+               $C=1 if ($C < 1);
+            }else{
+               $C=0;
+            }
+            $im->setPixel($i,$j,$colors[$C]);   #set the pixel color based on the map
+	    $i++;
+	    $cnt++;
+      }
+      $j++;
+   }
+
+   # now write the png file
+   open FILE2, ">$pngFile";
+   binmode FILE2;
+   print FILE2 $im->png;
+   close(FILE2);
+   $im=undef;
+}
+
+
+
+
 sub raster_wVectors {
    my ($pngFile,$xpix,$ypix,$numColors,$alpha,$cll,$cul,$cmapRef,$magref,$dirref,$azimuth,$vecSpacing,$minVecLength,$maxVecLength)=@_;
    my @MAG=@{$magref};
@@ -329,6 +379,90 @@ sub setColors {
    return @colors;
 
 }
+
+
+
+########################################################################
+# sub setColors_fade
+# 
+# a more general way to set the color palette for the pngs
+#
+#   this must be done for each image generated
+#   acts on a GD object, not the quadtree object
+#
+#   e.g.
+#   @colors=&setColors($im,@{$obj->{COLORMAP}},$alpha);  
+#     $im - a gd image object
+#     @{$obj->{COLORMAP}}  - scale, red, green, blue
+#         references to arrays of values between 0-1 representing the
+#         the colormap
+#     $alpha -  transparency 0-127 opaque-transparent
+#
+#   my $transparent=$colors[0];  - may be useful for later when
+#                                  setting transparent pixels	
+#  
+#   ...uses 128 colors.
+#
+########################################################################
+sub setColors_fade {
+
+   my $im=shift; # the gd image
+
+   my $ref=shift;   # ref to an array of scale values between 0 and 1
+   my @scale=@$ref;
+
+   $ref=shift;      # ref to an array of red values (0 to 1)
+   my @red=@$ref;
+
+   $ref=shift;   # ref to an array of green values (0 to 1)
+   my @green=@$ref;
+
+   $ref=shift;   # ref to an array of blue values (0 to 1)
+   my @blue=@$ref;
+
+   my $alpha=shift;  # 0 - 127 ; opaque - transparent
+       $alpha=0 unless defined($alpha); 
+
+   $scale[0]=0;
+   $scale[$#scale]=1;
+
+   my @X2;
+   foreach my $i (1..128) {
+       push @X2, $i/128;
+   }
+
+   my $r2=interp1(\@scale,\@red,\@X2);
+   my @R2= @{$r2};
+
+   my $g2=interp1(\@scale,\@green,\@X2);
+   my @G2= @{$g2};
+   
+   my $b2=interp1(\@scale,\@blue,\@X2);
+   my @B2= @{$b2};
+
+ 
+
+   my @colors;
+   $colors[0] = $im->colorAllocateAlpha(1,2,3,$alpha);  # reserve 0 for transparent
+
+   foreach my $i (0..127) {
+      my $ri=int(255 * $R2[$i]);   
+      my $gi=int(255 * $G2[$i]);   
+      my $bi=int(255 * $B2[$i]);   
+
+      $colors[$i+1]=$im->colorAllocateAlpha($ri,$gi,$bi,2*$i-1);
+   }
+
+   $colors[129]=$im->colorAllocateAlpha(255,255,255,0); # reserved for white
+   $colors[130]=$im->colorAllocateAlpha(0,0,0,0); # reserved for black
+
+   $im->transparent($colors[0]);  
+      
+   return @colors;
+
+}
+
+
 
 
 # sub to load colormap

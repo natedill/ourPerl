@@ -894,7 +894,9 @@ sub NOAA_gauge_POT{
     $minEventDuration = $args{-MINEVENTDURATION} if defined ($args{-MINEVENTDURATION});
     $minEventDuration=$minEventDuration*$recsPerHour;
     my $coopsFile= 0;
-    $coopsFile = $args{-COOPSFILE} if defined ($args{-COOPSFILE});;
+    $coopsFile = $args{-COOPSFILE} if defined ($args{-COOPSFILE});
+    my $pathToDataGetter='c:/ourPerl/DataGetters';
+    $pathToDataGetter=$args{-PATHTODATAGETTER} if defined $args{-PATHTODATAGETTER};
 
   
     open LOG, ">>$logFile" or die "ERROR:  GodaXtreme.pm:  fitWISoneLine:  cant open logfile $logFile for writing\n";
@@ -922,7 +924,7 @@ sub NOAA_gauge_POT{
     # get the COOPS data if we don't have it already
     unless ($coopsFile){
        $coopsFile="$stationID-$product-$datum-$units-$beginDate-$endDate".'.csv';
-       my $cmdstr="perl getCoopsdata.pl --station $stationID --begin $beginDate --end $endDate --product $product --datum $datum --units $units --timezone GMT --format CSV --outfile $coopsFile";
+       my $cmdstr="$pathToDataGetter/getCoopsdata.pl --station $stationID --begin $beginDate --end $endDate --product $product --datum $datum --units $units --timezone GMT --format CSV --outfile $coopsFile";
        print "Getting COOPS data with command: $cmdstr\n";
        system($cmdstr);
     }
@@ -936,6 +938,8 @@ sub NOAA_gauge_POT{
     my $firstline=1;
     my ($yyyy0,$mm0,$dd0,$HH0,$MM0);
     while(<IN>){
+       chomp;
+       $_.=',';
        next unless ( $_ =~ m/(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d),(.+?),/);
        my $yyyy=$1;
        my $mm=$2;
@@ -985,7 +989,7 @@ sub NOAA_gauge_POT{
        my $wse=shift(@WSE); push @WSE, $wse;
        my $t=shift(@T); push @T, $t;
        my $dh= $HR[0] - $hr;
-       if ( $dh > 1.01*$dt0 ){
+       if ( $dh > 1.0000000001*$dt0 ){
           my $dx=$dh/24;
           my $str=sprintf("%7.2f",$dx);
           print LOG "Missing data $str days between $t and $T[0]\n";

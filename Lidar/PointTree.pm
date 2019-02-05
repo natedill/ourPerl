@@ -875,6 +875,7 @@ sub writeKMLPoints{
    $obj->{CLIM1}=-10;
    $obj->{CLIM2}=10;
    $obj->{CBARTITLE}='colorbar title';
+   $obj->{NSKIP}=1;
 
    $obj->{KMLDIR}=$args{-KMLDIR} if defined $args{-KMLDIR};
    $obj->{PNGDIR}=$args{-PNGDIR} if defined $args{-KMLDIR};
@@ -885,6 +886,7 @@ sub writeKMLPoints{
    $obj->{CLIM1}=$args{-CLIM1} if defined $args{-CLIM1};
    $obj->{CLIM2}=$args{-CLIM2} if defined $args{-CLIM2};
    $obj->{CBARTITLE}=$args{-CBARTITLE} if defined $args{-CBARTITLE};
+   $obj->{NSKIP}=$args{-NSKIP} if defined $args{-NSKIP};
 
    # make directories to hold images and kml
    mkdir("$obj->{KMLDIR}");
@@ -927,7 +929,7 @@ sub _writeKMLPoints{
    if ($index ==0 ) {
       $kmlFile = "doc.kml";
    }else{  
-      $kmlFile = "$kmlDir/over$index.kml";
+      $kmlFile = "$kmlDir/pts$index.kml";
    }
          
    print "filename $kmlFile\n";
@@ -949,8 +951,11 @@ sub _writeKMLPoints{
         print FILE "    <Style id=\"$style\">\n";
         print FILE "      <IconStyle>\n";
         print FILE "         <Icon><href>$obj->{PNGDIR}/$pngFile</href></Icon>\n";
-        print FILE "         <scale>0.5</scale>\n";
+        print FILE "         <scale>0.3</scale>\n";
         print FILE "      </IconStyle>\n";
+        print FILE "      <LabelStyle>\n";
+        print FILE "         <scale>0.5</scale>\n";
+        print FILE "      </LabelStyle>\n";
         print FILE "      <BalloonStyle>\n";
         print FILE '         <text>$[description]</text>\n';
         print FILE "      </BalloonStyle>\n";
@@ -1002,7 +1007,7 @@ sub _writeKMLPoints{
    if (@kids) {    # if it has kids it is not a leaf, just write the network links
       foreach my $kid (@kids) {
          next unless($obj->{INTREE}[$kid]);	# dont write the link for children that dont have elements in them
-         my $lnkName="over$kid.kml";
+         my $lnkName="pts$kid.kml";
          ($north, $south, $east, $west) = @{$obj->{REGION}[$kid]};
           
          print FILE "	  <NetworkLink>\n";
@@ -1059,8 +1064,11 @@ sub _writeKMLPoints{
          read(FH,$buffer,26);
          next unless ($buffer);
          my ($x,$y,$z,$id)=unpack('d3n',$buffer);
-         my $pmark=$obj->writePointPlacemark($x,$y,$z,$id);
-         print FILE "$pmark";
+         my $skipping = ($point-1) % $obj->{NSKIP}; # % is modulo
+         unless ($skipping){
+            my $pmark=$obj->writePointPlacemark($x,$y,$z,$id);
+            print FILE "$pmark";
+         }
       } 
       close(FH);
    }# end if @kids
@@ -1087,9 +1095,11 @@ sub writePointPlacemark{
    $style = 128 if ($style > 128);
    $style = 1   if ($style <1) ; 
 
+   my $zstr=sprintf('%5.1f',$z);
+
    my $pmark='';
    $pmark.= "     <Placemark>\n";
-   $pmark.= "        <name></name>\n";
+   $pmark.= "        <name>$zstr</name>\n";
    $pmark.= "        <styleUrl>../doc.kml#Style$style</styleUrl>\n";
    $pmark.= "        <description>\n";
    #$pmark.= "         <p><b>$desc</b></p>\n";
@@ -1544,7 +1554,7 @@ sub makeColorbar {
         
         my $dtmp = $self->{CLIM1} + ($x - $xMarg)*$dClim/$xWidth;
         
-        my $tickLabel=sprintf("%4d",$dtmp);
+        my $tickLabel=sprintf("%0.1f",$dtmp);
         $im->string(gdMediumBoldFont,$intx-11,$ytmp+6,$tickLabel,$black);
         $x=$x+$dx;            
     
@@ -2521,6 +2531,7 @@ sub loadColormap{
 
     }
     close(CM);
+
     $obj->{COLORMAP}=  [ \@s,\@r,\@g,\@b];
 }
 
