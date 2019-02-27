@@ -660,6 +660,7 @@ sub makePNGs{
     close(FH);
 
     $obj->_bottomUp(0,$obj->{COLORMAP});  # this should write the rest of the png file
+    $/="\n";
 
 }
 
@@ -1139,7 +1140,7 @@ sub makeColorDots {
 
      my $im = new GD::Image($xpix,$ypix);
         &setColors($im,@{$obj->{COLORMAP}}); 
-	
+        my @colors=@{$obj->{COLORMAP}};
         my $i;
         my $j =  0;
         my $cnt = 0;	
@@ -2529,10 +2530,13 @@ sub loadColormap{
        push @g, $gg;
        push @b, $bb;
 
+      # print "ssrrggbb $ss,$rr,$gg,$bb\n";
+
     }
     close(CM);
-
     $obj->{COLORMAP}=  [ \@s,\@r,\@g,\@b];
+
+ 
 }
 
 #################################################
@@ -2891,6 +2895,7 @@ sub finalizeBin{
     }
     close(IN);
     close(OUT);
+    $/="\n";
 }
 
 #########################################################################################
@@ -2956,7 +2961,7 @@ sub finalizeBin{
    close(OUT);
    close(IN);
    $obj->{BEGINOFFSET}=\@BeginOffset;
-
+   $/="\n";
    
 }
 
