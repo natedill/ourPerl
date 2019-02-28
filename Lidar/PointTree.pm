@@ -877,6 +877,7 @@ sub writeKMLPoints{
    $obj->{CLIM2}=10;
    $obj->{CBARTITLE}='colorbar title';
    $obj->{NSKIP}=1;
+   $obj->{ICONLABELSCALE}=[0.5, 0.5];
 
    $obj->{KMLDIR}=$args{-KMLDIR} if defined $args{-KMLDIR};
    $obj->{PNGDIR}=$args{-PNGDIR} if defined $args{-KMLDIR};
@@ -888,6 +889,7 @@ sub writeKMLPoints{
    $obj->{CLIM2}=$args{-CLIM2} if defined $args{-CLIM2};
    $obj->{CBARTITLE}=$args{-CBARTITLE} if defined $args{-CBARTITLE};
    $obj->{NSKIP}=$args{-NSKIP} if defined $args{-NSKIP};
+   $obj->{ICONLABELSCALE}=$args{-ICONLABELSCALE} if defined $args{-ICONLABELSCALE};
 
    # make directories to hold images and kml
    mkdir("$obj->{KMLDIR}");
@@ -925,6 +927,7 @@ sub _writeKMLPoints{
    unless (@kids) {$maxLOD=-1;}
 
    my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
+   my ($iconScale,$labelScale)=@{$obj->{ICONLABELSCALE}};
 
         
    if ($index ==0 ) {
@@ -952,10 +955,10 @@ sub _writeKMLPoints{
         print FILE "    <Style id=\"$style\">\n";
         print FILE "      <IconStyle>\n";
         print FILE "         <Icon><href>$obj->{PNGDIR}/$pngFile</href></Icon>\n";
-        print FILE "         <scale>0.3</scale>\n";
+        print FILE "         <scale>$iconScale</scale>\n";
         print FILE "      </IconStyle>\n";
         print FILE "      <LabelStyle>\n";
-        print FILE "         <scale>0.5</scale>\n";
+        print FILE "         <scale>$labelScale</scale>\n";
         print FILE "      </LabelStyle>\n";
         print FILE "      <BalloonStyle>\n";
         print FILE '         <text>$[description]</text>\n';
