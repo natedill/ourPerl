@@ -4,14 +4,14 @@ use warnings;
 
 # based on Goda, 2012 Random Seas and Design of Maritime Structures
 # JONSWAP frequency spectrum, with Mitsuyasu type directional distribution
-
+my $dir0=-70;        # mean angle of spectrum, note 0 is the direction of STWAVE i axis, + is CW
 
 my $pi=4*atan2(1,1);
 my $deg2rad=$pi/180;
 my $g=9.81;
 
-my $hs=7.04;  # significant wave height, meters
-my $tp=11.6;  # peak period, seconds
+my $hs=6.29/3.28083;  # significant wave height, meters
+my $tp=4.88;  # peak period, seconds
 
 my $gamma=3.3; # peak enhancement factor, 
                # use appoximately 1 - 7 bigger gamma means sharper peak
@@ -26,18 +26,17 @@ my $smax=10;   # spreading parameter for Mitsuyasu type directional spreading
 my $numFreqs=30;
 
 my $numAngles=35;  # use 35 for half plane
-my $dir0=0;        # mean angle of spectrum, note 0 is the direction of STWAVE i axis, + is CW
 
 # same params as in sim file
-my $x=519260;
-my $y=4863990;
-my $wse=3.05;
+my $x=512362.624762708;
+my $y=4886014.80561003;
+my $wse=3.0;
 my $umag=25.1;
-my $udir=0;
+my $udir=0.0;
 my $snapID='snap1';
-my $azimuth=58.4183236064073;
+my $azimuth=-110.323957632935;
 
-my $engFile='ST63020-SW-quadrant-100-yr.eng';
+my $engFile='project.eng.in';
 
 # calculate smax from wind speed and peak period eqn 2.26 - or just set smax directly above
 # $smax=11.5*(2*$pi*(1/$tp)*$umag/$g)**-2.5;
@@ -59,12 +58,19 @@ my $endFreq=2*$fp;
 my $df=($endFreq-$startFreq)/($numFreqs-1);
 my @Freq=( );
 my $f=$startFreq;
-push @Freq, $f;
-while ($f <= $endFreq){
+#push @Freq, $f;
+while ($f < $endFreq){
+   my $f_=sprintf('%0.14e',$f);
+   push @Freq, $f_;
    $f=$f+$df;
-   push @Freq, $f;
 }
+push @Freq, $endFreq if $#Freq+1 < $numFreqs;
+print "start F = $startFreq, end F = $endFreq\n";
 print "FREQ @Freq\n";
+
+my $nf2=$#Freq+1;
+die "NUMFREQ id $numFreqs, but determined $nf2 frequencies\n" unless ($nf2 == $numFreqs);
+
 
 
 # set directional bins
@@ -106,6 +112,7 @@ foreach my $freq (@Freq){
      foreach my $dir (@DIR){
          my $G=$G0*(cos(($dir-$dir0)/2))**(2*$s);
          my $eng=$S*$G;
+         $eng=sprintf('%0.14e',$eng);
          push @ENG, $eng;
          print "S $S, G, $G\n";
          
@@ -130,6 +137,7 @@ print OUT " numrecs = 1,\n";
 print OUT " numfreq = $numFreqs,\n";
 print OUT " numangle = $numAngles,\n";
 print OUT " numpoints = 1,\n";
+$azimuth=sprintf('%f',$azimuth);
 print OUT " azimuth = $azimuth,\n";
 print OUT " coord_sys = \"UTM\",\n";
 print OUT " spzone = 19\n";
@@ -137,7 +145,9 @@ print OUT "/\n";
 print OUT "#Frequencies\n";
 print OUT "@Freq\n";
 print OUT "#  Mitsuyasu smax is $smax\n";  # need a line here
-print OUT "$snapID $umag $udir $fp $wse $x $y\n";
+my $str=sprintf("%f %f $f %f %f %f %f",$umag,$udir,$fp,$wse,$x,$y);
+#print OUT "$snapID $umag $udir $fp $wse $x $y\n";
+print OUT "$snapID $str\n";
 foreach my $eng (@ENG){
   print OUT "$eng\n";
 }
