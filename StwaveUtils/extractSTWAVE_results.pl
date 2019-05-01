@@ -8,7 +8,7 @@ use Mapping::UTMconvert;
 use Cwd qw(getcwd);
 
 # script to extract stwave results at a specific coordinate locations
-my $simFile='Bingham.sim';  # assume same for all directions
+my $simFile='stwave.sim';  # assume same for all directions
 
 my @DIRS=('0','45','67.5','90','337.5');
 
