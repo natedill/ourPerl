@@ -79,6 +79,14 @@ sub new
      $self->{MINZ}=undef;
      $self->{MAXZ}=undef;
 
+     $self->{PNTPACKSTR}='d3n';
+     $self->{PNTBUFBYTES}=26;
+     if ($args{-IDBITS} == 32){
+        $self->{PNTPACKSTR}='d3N';
+        $self->{PNTBUFBYTES}=28;
+     }
+
+
      bless $self, $class;
      return $self;
       
@@ -631,10 +639,10 @@ sub makePNGs{
         $/=\8;
         while (<FH>){
            my ($index,$npts)=unpack("L2",$_);
-           $/=\26;
+           $/=\$obj->{PNTBUFBYTES};
            while ($npts--){
                my $buf=<FH>;
-               my ($x,$y,$z,$id)=unpack("d3n",$buf);
+               my ($x,$y,$z,$id)=unpack($obj->{PNTPACKSTR},$buf);
                $z=$z*$zMultAdjust + $zAddAdjust; 
                $obj->setPixel($x,$y,$z,$index);
            }
@@ -643,9 +651,9 @@ sub makePNGs{
            $/=\8;
         }
     }else{           # for a file with finalizaton tags
-       $/=\26;
+       $/=\$obj->{PNTBUFBYTES};;
        while (<FH>){ 
-          my ($x,$y,$z,$id)=unpack("d3n",$_);
+          my ($x,$y,$z,$id)=unpack($obj->{PNTPACKSTR},$_);
           if ($x==-999999) {
             #  my $finishMe=$z;
               print "finishing $z\n";
@@ -929,7 +937,7 @@ sub _writeKMLPoints{
    my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
    my ($iconScale,$labelScale)=@{$obj->{ICONLABELSCALE}};
 
-        
+
    if ($index ==0 ) {
       $kmlFile = "doc.kml";
    }else{  
@@ -1065,9 +1073,9 @@ sub _writeKMLPoints{
           next;
       }
       foreach my $point (1..$npoints){
-         read(FH,$buffer,26);
+         read(FH,$buffer,$obj->{PNTBUFBYTES});
          next unless ($buffer);
-         my ($x,$y,$z,$id)=unpack('d3n',$buffer);
+         my ($x,$y,$z,$id)=unpack($obj->{PNTPACKSTR},$buffer);
          my $skipping = ($point-1) % $obj->{NSKIP}; # % is modulo
          unless ($skipping){
             my $pmark=$obj->writePointPlacemark($x,$y,$z,$id);
@@ -1108,8 +1116,8 @@ sub writePointPlacemark{
    $pmark.= "        <description>\n";
    #$pmark.= "         <p><b>$desc</b></p>\n";
    my $elevstring=sprintf ("%7.3f",$z);
-   $pmark.= "         <p> Elev = $elevstring</p>\n";
-   $pmark.= "         <p> Class = $id</p>\n";
+   $pmark.= "         <p> Value = $elevstring</p>\n";
+   $pmark.= "         <p> Id = $id</p>\n";
    $pmark.= "        </description>\n";
    $pmark.= "        <Point>\n ";
    $pmark.= "          <coordinates>$x,$y,$z</coordinates>\n";
@@ -2835,7 +2843,7 @@ sub addPointToBin {
          my $z=shift (@Z);
          my $id=shift (@ID);
          $obj->countPoint($x,$y);
-         my $buf=pack ("d3n",$x,$y,$z,$id);
+         my $buf=pack ($obj->{PNTPACKSTR},$x,$y,$z,$id);
          print $fh "$buf";
          if (defined $obj->{MAXZ}){
             $obj->{MAXZ}=$z if $z > $obj->{MAXZ};            
@@ -2883,16 +2891,16 @@ sub finalizeBin{
       
      binmode(OUT);
      
-     $/=\26;  # read 26 bytes at a time
+     $/=\$obj->{PNTBUFBYTES};  # read 26 bytes at a time
 
     while (<IN>){ 
-        my ($x,$y,$z,$ID)=unpack("d3n",$_);
+        my ($x,$y,$z,$ID)=unpack($obj->{PNTPACKSTR},$_);
         my $indx = $obj->decrementPoint($x,$y);
         next if ($indx < 0);  # will be -1 if the point is not in the root of the tree, so dont write it
-        my $buf=pack("d3n",$x,$y,$z,$ID);     # surrvey id is a 2 byte value "network" big-endian order
+        my $buf=pack($obj->{PNTPACKSTR},$x,$y,$z,$ID);     # surrvey id is a 2 byte value "network" big-endian order
         print OUT "$buf";
         if ($indx) {
-           my $buf=pack("d3n",-999999,-999999,$indx,0);
+           my $buf=pack($obj->{PNTPACKSTR},-999999,-999999,$indx,0);
 	   print OUT "$buf";
         }
     }
@@ -2929,7 +2937,7 @@ sub finalizeBin{
      open OUT, ">$obj->{SFINALIZED}";
      binmode (IN);
      binmode (OUT);
-     $/=\26;
+     $/=\$obj->{PNTBUFBYTES};
  
      my @BeginOffset;
     
@@ -2937,7 +2945,7 @@ sub finalizeBin{
      my @TT;
 
    while (<IN>){ 
-      my ($x,$y,$z,$ID)=unpack("d3n",$_);
+      my ($x,$y,$z,$ID)=unpack($obj->{PNTPACKSTR},$_);
     
       if ($x==-999999) {
           my $finishMe=$z;
@@ -2950,7 +2958,7 @@ sub finalizeBin{
           print "superFinishing $z\n";
           foreach  my $point (@{$TT[$finishMe]}){
              print OUT "$point";
-             $offset=$offset+26;    
+             $offset=$offset+$obj->{PNTBUFBYTES};    
           }
           @{$TT[$finishMe]}=undef;
           $TT[$finishMe]=undef; 
@@ -3030,9 +3038,9 @@ sub getPoints{
           next;
       }
       foreach my $point (1..$npoints){
-         read(FH3,$buffer,26);
+         read(FH3,$buffer,$obj->{PNTBUFBYTES});
          next unless ($buffer);
-         my ($xp,$yp,$zp,$sp)=unpack('d3n',$buffer);
+         my ($xp,$yp,$zp,$sp)=unpack($obj->{PNTPACKSTR},$buffer);
         
          my $dsq=($xp-$x)**2 + ($yp-$y)**2;
 
@@ -3115,9 +3123,9 @@ sub getPoints_sorted{
           next;
       }
       foreach my $point (1..$npoints){
-         read(FH3,$buffer,26);
+         read(FH3,$buffer,$obj->{PNTBUFBYTES});
          next unless ($buffer);
-         my ($xp,$yp,$zp,$sp)=unpack('d3n',$buffer);
+         my ($xp,$yp,$zp,$sp)=unpack($obj->{PNTPACKSTR},$buffer);
         
          my $dsq=($xp-$x)**2 + ($yp-$y)**2;
 
