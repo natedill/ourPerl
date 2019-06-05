@@ -7,12 +7,13 @@ use StwaveUtils::StwaveObj;
 use Mapping::UTMconvert;
 use Lidar::PointTree;
 use Geometry::PolyTools;
+use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+use File::Path;
 
-my $simfile='Bingham.sim';
+my $simfile='3Southport_nest2.sim';
 
-my $dataName='tp';
-my $fieldName='1/fma';
-my $fieldName2='1_div_fma';
+my $dataName='DEP';
+my $fieldName='Depth';
 my $record=1; 
 
 my $kmlPolygon='search.kml';  # kml polygon to select area leave undef if you want to use the whole grid
@@ -21,13 +22,13 @@ my $kmlPolygon='search.kml';  # kml polygon to select area leave undef if you wa
 # config for the points kmz
 my $tileSize=0.00001*100;   # size of "square" quad-tree leaf nodes in degrees
 my $colorFile='c:/ourPerl/jet.txt';
-my @CLIM=(0,5);
-my $numColors=10;
+my @CLIM=(-20,10);
+my $numColors=15;
 my $addAdjust=0;
-my $multAdjust=1;
+my $multAdjust=-3.280833333;
 my $pngDir='pImages';
 my $kmlDir='pFiles';
-my $cbarTitle='Peak Wave Period, seconds';
+my $cbarTitle='Bottom Elevation (ft-NAVD88)';
 my $nskip=1;
 my $iconLabelScale=[0.5,0.5];
 
@@ -62,6 +63,8 @@ my @LON=();
 my @LAT=();
 my @Z=();
 my @CELL=();
+my @I=();
+my @J=();
 
 my $minLat=999999;
 my $maxLat=-999999;
@@ -69,10 +72,10 @@ my $minLon=9999999;
 my $maxLon=-9999999;
 
 
+
 foreach my $i (1..$ni){
    foreach my $j (1..$nj){
       my $cell=$stw->getCellNumber($i,$j,$record);
-      push @CELL, $cell;
 
       my ($x,$y)=$stw->getXy($i,$j);
       my ($lon,$lat)=UTMconvert::utm2deg($x,$y,"$zone T");
@@ -82,6 +85,9 @@ foreach my $i (1..$ni){
       }
       push @LON, $lon;
       push @LAT, $lat;
+      push @I, $i;
+      push @J, $j;
+      push @CELL, $cell;
 
       my $z=$stw->getSpatialDataByIjRecField($dataName,$i,$j,$record,$fieldName);
       push @Z,$z;
@@ -95,13 +101,14 @@ foreach my $i (1..$ni){
    }
 }
 
-
+$fieldName =~ s/\//_div_/;
 # print a lon,lat,z file
-open OUT, ">$dataName-$fieldName2-$record.xyz";
-print OUT "lon,lat,$fieldName\n";
+my $xyzFile="$dataName-$fieldName-$record.xyz";
+open OUT, ">$xyzFile";
+print OUT "I,J,CELL_ID,lon,lat,$fieldName\n";
 
 foreach my $n (0..$#LON){
-    print OUT "$LON[$n],$LAT[$n],$Z[$n]\n";
+    print OUT "$I[$n],$J[$n],$CELL[$n],$LON[$n],$LAT[$n],$Z[$n]\n";
 }
 close OUT;
 
@@ -115,7 +122,9 @@ my $tree=PointTree->new(
                           -SOUTH=>$minLat,
                           -EAST=>$maxLon,
                           -WEST=>$minLon,
-			  -MINDY=>$tileSize      #approximately 256 x 256 meter
+			  -MINDY=>$tileSize,      #approximately 256 x 256 meter
+                          -IDBITS=>32
+
                      );
 
 # create bin file
@@ -140,4 +149,31 @@ $tree->writeKMLPoints(
                         -ICONLABELSCALE=>$iconLabelScale
                         );
 
+
+
+
+# zip it up  
+my $zip = Archive::Zip->new();
+ 
+    # add the Files Dirs
+my $dir_member = $zip->addTree( $kmlDir,$kmlDir );
+my $dir_member2 = $zip->addTree( $pngDir,$pngDir );
+
+# add the doc.file
+my $kmldoc='doc.kml';
+my $file_member = $zip->addFile( $kmldoc );
+
+# write it
+my $kmzFile=$xyzFile;
+$kmzFile =~ s/xyz$/kmz/;
+unless ( $zip->writeToFileNamed("$kmzFile") == AZ_OK ) {
+        die 'write error';
+    }
+#clean up
+unlink $kmldoc;
+rmtree($pngDir);
+rmtree($kmlDir);
+unlink 'binfile';
+unlink 'binfile.fin';
+unlink 'binfile.fin.sfn';
 
