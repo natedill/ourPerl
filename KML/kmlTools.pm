@@ -295,6 +295,31 @@ return ($str);
 
 }
 
+
+
+
+# private sub for writing a string of a point placemark
+sub writePointPlacemark{
+   my $obj=shift;
+   my ($x,$y,$z,$desc,$styleID)=@_;
+
+   my $zstr=sprintf('%5.1f',$z);
+
+   my $pmark='';
+   $pmark.= "     <Placemark>\n";
+   $pmark.= "        <name>$zstr</name>\n";
+   $pmark.= "        <styleUrl>$styleID</styleUrl>\n" if (defined $styleID);
+   $pmark.= "        <description>$desc</description>\n" if (defined $desc);
+   $pmark.= "        <Point>\n ";
+   $pmark.= "          <coordinates>$x,$y,$z</coordinates>\n";
+   $pmark.= "        </Point>\n";
+   $pmark.= "     </Placemark>\n";
+   return $pmark;
+}
+
+
+
+
 1;
 
 
