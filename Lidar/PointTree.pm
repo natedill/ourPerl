@@ -941,7 +941,7 @@ sub _writeKMLPoints{
 
 
    if ($index ==0 ) {
-      $kmlFile = "doc.kml";
+      $kmlFile = "p_doc.kml";
    }else{  
       $kmlFile = "$kmlDir/pts$index.kml";
    }
