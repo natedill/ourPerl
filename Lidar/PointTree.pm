@@ -854,17 +854,17 @@ sub _writeKMLOverlay{
 
 #######################################################
 # sub writeKMLPoints(                                 #  public method
-#                   $obj->{KMLDIR}='pFiles';
-#                   $obj->{PNGDIR}='pImages';
-#                   $obj->{NUMCOLORS}=16;
-#                   $obj->{ZADDADJUST}=0;
-#                   $obj->{ZMULTADJUST}=1; 
-#                   $obj->{COLORFILE}='c:/ourPerl/jet.txt';	
-#                   $obj->{CLIM1}=-10;
-#                   $obj->{CLIM2}=10;
-#                   $obj->{CBARTITLE}='colorbar title';
-#                   $obj->{NSKIP}=1;
-#                   $obj->{ICONLABELSCALE}=[0.5, 0.5];
+#                    -COLORFILE=>'c:/ourPerl/jet.txt',
+#                    -CLIM1=>$CLIM[0],
+#                    -CLIM2=>$CLIM[1],
+#                    -NUMCOLORS=>$numColors,
+#                    -ZADDADJUST=>$addAdjust,
+#                    -ZMULTADJUST=>$multAdjust,
+#                    -KMLDIR=>'Files',
+#                    -PNGDIR=>'Images',
+#                    -CBARTITLE=>'Elevation ft-NAVD88',
+#                    -NNSKIP=>$nskip, # use every nskip points
+#                    -ICONLABELSCALE=[$iconScale, $labelScale]
 #                   ) 
 #
 # writes the kml for Points 
