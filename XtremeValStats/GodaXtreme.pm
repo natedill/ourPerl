@@ -452,7 +452,8 @@ sub returnValue{
 #                     -OFFSHOREDIR => $offShoreDir,
 #                     -HALFSECTOR => $halfSectorWidth,
 #                     -RECORDFREQ => $recsPerHour,
-#                     -MINEVENTDURATION => $minEventDuration        
+#                     -MINEVENTDURATION => $minEventDuration,
+#                     -WINDORWAVE=>'wind'        
 #                   )  
 #
 
@@ -471,8 +472,17 @@ sub WISoneLinePOT{
     my $minEventDuration = 1;
     $minEventDuration = $args{-MINEVENTDURATION} if defined ($args{-MINEVENTDURATION});
     $minEventDuration=$minEventDuration*$recsPerHour;
-
+    
+   
+    my $windOrWave=lc($args{-WINDORWAVE});
+    my $magIndex=9;  # these are defaults for wave analysis, wind spd and dir are 4,5, respectively
+    my $dirIndex=15;
+    if ($windOrWave =~ m/wind/){
+       $magIndex=4;  
+       $dirIndex=5;
+    }
   
+
     open LOG, ">>$logFile" or die "ERROR:  GodaXtreme.pm:  fitWISoneLine:  cant open logfile $logFile for writing\n";
               #         1         2         3         4         5         6         7
               #123456789012345678901234567890123456789012345678901234567890123456789012
@@ -495,6 +505,17 @@ sub WISoneLinePOT{
     print  "#----------------------------------------------------------------------#\n";
     print  "#                                                                      #\n";
      
+    # say if this is wind or wave analysis
+    if ($windOrWave =~ m/wind/){
+        print LOG "#                   Analysis of Wind Speed                            #\n";   
+        print LOG "# -where log reports Sig. Wave Ht. in meters replace with Wind Speed in meters/second #\n\n";   
+           print  "#                   Analysis of Wind Speed                            #\n";   
+           print  "# -where log reports Sig. Wave Ht. in meters replace with Wind Speed in meters/second #\n\n";   
+    }else{
+        print LOG "#       Analysis of Significant Wave Height                     #\n\n";   
+           print  "#       Analysis of Significant Wave Height                     #\n\n";   
+    }   
+
     # ingest the oneline file 
     my @T;  
     my @HS;
@@ -516,8 +537,8 @@ sub WISoneLinePOT{
        my @data=split(/\s+/,$_);
 
        push @T, $data[0];
-       my $hs = $data[9];
-       my $dir = $data[15];
+       my $hs = $data[$magIndex];
+       my $dir = $data[$dirIndex];
        my $tp= $data[11];
        $station = $data[1];
        $lat = $data[2];
