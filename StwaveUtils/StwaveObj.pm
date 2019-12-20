@@ -1039,16 +1039,17 @@ sub writeSimFile{
 ########################################################################
 # sub interpDepFromScatter
 # 
-#  $stw->interpDepFromScatter(\@PX,\@PY,\@PZ);
+#  $stw->interpDepFromScatter(\@PX,\@PY,\@PZ[,$power,$searchRadius]);
 #
 ########################################################################
 sub interpDepFromScatter{
     my $obj=shift;
-    my ($px,$py,$pz)=@_;
+    my ($px,$py,$pz,$power,$searchRadius)=@_;
     my @PX=@$px;
     my @PY=@$py;
     my @PZ=@$pz;
-
+    $searchRadius=10 unless defined $searchRadius;  # initial radius to search for data in idw interpolation
+    $power=2 unless defined $power;  # power used in calculatoing weights in idw interpolation
 
     #my $x0=$obj->{spatial_grid_parms}->{x0};
     #my $y0=$obj->{spatial_grid_parms}->{y0};
@@ -1105,7 +1106,7 @@ sub interpDepFromScatter{
        next if ($HasData[$n]);
        my ($i,$j)=$obj->getIjFromCellNumber($n);
        
-       my $z = &idw($i,$j,\@PX,\@PY,\@PZ,12);
+       my $z = &idw($i,$j,\@PX,\@PY,\@PZ,$power,$searchRadius);
        print "idw for cell $n is $z\n";
        $DEP[$n]=$z;
     }
@@ -1710,20 +1711,28 @@ sub trimStr
 #
 ###########################################################
 sub idw {
-   my ($xp,$yp,$Xref,$Yref,$Zref,$power)=@_;;
+   my ($xp,$yp,$Xref,$Yref,$Zref,$power,$searchRad)=@_;;
    my @Y=@{$Yref};
    my @X=@{$Xref};
    my @Z=@{$Zref};
-     $power=0.5*$power; 
 
    my $sumW=0;
    my $sum=0;
+   my $rad=$searchRad;
    #compute weights
-   foreach my $n (0..$#Z) {
-     
-       my $w=1/(($X[$n]-$xp)**2.0 + ($Y[$n]-$yp)**2.0)**$power;
+   while ($sumW == 0){
+     foreach my $n (0..$#Z) {
+
+       # remember, distances are just interger grid cell size values
+       my $ds=(($X[$n]-$xp)**2.0 + ($Y[$n]-$yp)**2.0)**0.5;
+       
+       next if $ds > $rad;     
+
+       my $w=1/$ds**$power;
        $sum=$sum+$w*$Z[$n];
        $sumW=$sumW + $w;
+     }
+     $rad+=$searchRad;
    }
 
    my $result= $sum/$sumW;
@@ -1736,7 +1745,7 @@ sub idw {
 ########################################################################
 # sub writeConstWindFile
 #
-#  $stw->writeConstWindFile ($umag,$udir[,'project.wind.in']);
+#  $stw->writeConstWindFile (\@IDDS,\@umag,\@udir,'project.wind.in');
 #
 #
 #
@@ -1744,19 +1753,23 @@ sub idw {
 ########################################################################
 sub writeConstWindFile {
     my $obj=shift;
-    my $umag=shift;
-    my $udir=shift;
-    my $fileName=shift;
+    my @IDDS=@{$_[0]};
+    my @UMAG=@{$_[1]};
+    my @UDIR=@{$_[2]};
+    my $fileName=$_[3];
     my $ni=$obj->{spatial_grid_parms}->{n_cell_i};
     my $nj=$obj->{spatial_grid_parms}->{n_cell_j};
     my $dx=$obj->{spatial_grid_parms}->{dx};
     my $dy=$obj->{spatial_grid_parms}->{dy};
+    my $numCells=$ni*$nj;
+
+    my $numrecs=$#IDDS+1;
 
     my $dataName='wind';
     $obj->{$dataName}={};
     $obj->{$dataName}->{datadims}={ 
                                     'datatype'=>0,
-                                    'numrecs'=>1,
+                                    'numrecs'=>$numrecs,
                                     'numflds'=>2,
                                     'ni'=>$ni,
                                     'nj'=>$nj,
@@ -1776,22 +1789,26 @@ sub writeConstWindFile {
                                  };
     $obj->{$dataName}->{dataset_keys}=['fldname(1)','fldname(2)','fldunits(1)','fldunits(2)','recinc','recunits','reftime'];
  
-    # now the data
-    $obj->{$dataName}->{fieldNames}=[];
-    my $field='Wind Speed';
-    push @{$obj->{$dataName}->{fieldNames}},$field;
-    #binstring $obj->{$dataName}->{$field}=\@DEP;
-    foreach my $n (1..$ni*$nj){
-        $obj->{$dataName}->{$field} .= pack ("d",$umag);
-    }
+    # now the data 
+    my $field;
+    foreach my $idd (@IDDS){
+       my $umag = shift @UMAG;
+       my $udir = shift @UDIR;
+       $obj->{$dataName}->{fieldNames}=[];
+       $field='Wind Speed';
+       push @{$obj->{$dataName}->{fieldNames}},$field;
+       #binstring $obj->{$dataName}->{$field}=\@DEP;
+       foreach my $n (1..$numCells){
+           $obj->{$dataName}->{$field} .= pack ("d",$umag);
+       }
 
-    $field='Wind Direction';
-    push @{$obj->{$dataName}->{fieldNames}},$field;
-    #binstring $obj->{$dataName}->{$field}=\@DEP;
-    foreach my $n (1..$ni*$nj){
-        $obj->{$dataName}->{$field} .= pack ("d",$udir);
-    }
-
+       $field='Wind Direction';
+       push @{$obj->{$dataName}->{fieldNames}},$field;
+       #binstring $obj->{$dataName}->{$field}=\@DEP;
+       foreach my $n (1..$numCells){
+           $obj->{$dataName}->{$field} .= pack ("d",$udir);
+       }
+    }# end loop over IDDS
 
     unless ($fileName =~ m/^\'.+\'$/){
        $fileName="\'$fileName\'";
@@ -1834,23 +1851,31 @@ sub writeConstWindFile {
        print WIND "/\n";      
    }     
    # now the data
-   #one record
-   print WIND "IDD 00\n";
-   #loop over fields
+
    my @ALLFIELDS=();
    foreach my $field (@{$obj->{$dataName}->{fieldNames}}){
-      push @ALLFIELDS,$obj->{$dataName}->{$field};
-print "field $field\n";
+      push @ALLFIELDS,\$obj->{$dataName}->{$field};
    }
-   my $numCells=$ni*$nj;
-   foreach my $n (0..$numCells-1){
-      foreach my $f (0..$#ALLFIELDS){
-         my $datum=unpack ("d",substr($ALLFIELDS[$f],$n*8,8));
-         #binstring print DEP "$ALLFIELDS[$f][$n]\n";
-         print WIND "$datum ";
+
+   #one record
+   my $recnum=0;
+   foreach my $idd (@IDDS){
+
+      print WIND "IDD $idd\n";
+      #loop over fields
+
+      my $startn=$numCells*$recnum;
+      my $endn=$startn+$numCells-1;
+      foreach my $n ($startn..$endn){
+         foreach my $f (0..$#ALLFIELDS){
+            my $datum=unpack ("d",substr(${$ALLFIELDS[$f]},$n*8,8));
+            #binstring print DEP "$ALLFIELDS[$f][$n]\n";
+            print WIND "$datum ";
+         }
+         print WIND "\n";
       }
-      print WIND "\n";
-   }
+      $recnum++;
+   }#end loop over IDDS
   
    close (WIND);
 

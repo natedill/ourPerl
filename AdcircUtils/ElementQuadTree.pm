@@ -43,7 +43,7 @@ use Storable;
 #
 # input is a hash e.g.
 #
-# $tree = elementQuadTree->new(
+# $tree = ElementQuadTree->new(
 #                                  -NORTH=>$north   # the region for the tree
 #                                  -SOUTH=>$south
 #                                  -EAST =>$east
@@ -1536,6 +1536,9 @@ return $cross;
 #   input is a hash
 #
 # interpolates values of @ZDATA at xx,yy
+# @ZDATA should be indexed by node number.
+# i.e. @ZDATA[1] is for node 1
+#      @ZDATA[0] is undefined
 ##############################################
 sub getZvalue {
 	my $obj=shift;

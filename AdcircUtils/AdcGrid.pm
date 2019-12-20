@@ -2022,9 +2022,73 @@ sub findDownhillProxies{
     } 
             
     return \@PROXIES;
-}    
-            
+}   
+
+
+#######################################################################
+# sub cropGrid (\@PX,\@PY,'cropped.14')
+#
+#  
+#
+#  writes a fort.14 for a subgrid in the
+#  polygon  
+#
+sub cropGrid {
+
+   my ($obj,$pxref,$pyref,$outfilename)=@_;
+   my $pne=$obj->getVar('NE');
+   my $pnp=$obj->getVar('NP');
+
+
+   # get list of nodes in polygon
+   my $printFound=0;   
+   my (@foundNodes)=$obj->findNodesInPoly($pxref,$pyref,$printFound);
+
+
    
+   # write subgrid nodes
+   my %NID; # contains subgrid nid given parent nid 
+   my $nodesStr='';
+   my $np=$#foundNodes+1;
+   foreach my $n (1..$np){
+      my $pnid=$foundNodes[$n-1];
+      $NID{$pnid}=$n;
+      my ($x, $y, $dp) = $obj->getNode($pnid); 
+      $nodesStr.="$n $x $y $dp  !$pnid\n";
+   }
+    
+   #find and write subgrid elements
+   my $eleStr='';
+   my $ne=0;
+   foreach my $eid (1..$pne){
+     my ($n1,$n2,$n3)=$obj->getElement($eid);
+      if (defined $NID{$n1}){
+       if (defined $NID{$n2}){
+        if (defined $NID{$n3}){
+           $ne++;
+           $eleStr.="$ne 3 $NID{$n1} $NID{$n2} $NID{$n3}\n";    
+        }
+       }
+     }
+   }
+
+   # write subgrid header
+   open OUT, ">$outfilename" or die "ERROR: AdcGrid.PM: cropGrid: cannot open $outfilename for writing";
+   print OUT "Cropped by AdcGrid.pm: $obj->{AGRID}\n";
+   print OUT "$ne $np\n";
+
+   # write nodes
+   print OUT "$nodesStr";
+
+   # write elements
+   print OUT "$eleStr";
+ 
+   # write boundary conditions
+   print OUT "0\n0\n0\n0\n";
+
+   return ($ne,$np,@foundNodes);
+            
+}
 #######################################################################
 # sub load63
 #

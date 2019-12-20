@@ -145,7 +145,7 @@ sub blueStyle {
 	</IconStyle>
 	<LineStyle>
 		<color>ffff0000</color>
-		<width>3</width>
+		<width>1</width>
 	</LineStyle>
 	<PolyStyle>
 		<fill>0</fill>
@@ -167,7 +167,7 @@ sub greenStyle {
 	</IconStyle>
 	<LineStyle>
 		<color>ff00ff00</color>
-		<width>3</width>
+		<width>1</width>
 	</LineStyle>
 	<PolyStyle>
 		<fill>0</fill>

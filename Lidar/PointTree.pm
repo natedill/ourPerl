@@ -81,11 +81,12 @@ sub new
 
      $self->{PNTPACKSTR}='d3n';
      $self->{PNTBUFBYTES}=26;
-     if ($args{-IDBITS} == 32){
-        $self->{PNTPACKSTR}='d3N';
-        $self->{PNTBUFBYTES}=28;
+     if (defined $args{-IDBITS}){
+        if ($args{-IDBITS} == 32){
+           $self->{PNTPACKSTR}='d3N';
+           $self->{PNTBUFBYTES}=28;
+        }
      }
-
 
      bless $self, $class;
      return $self;
