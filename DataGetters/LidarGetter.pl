@@ -134,14 +134,19 @@ foreach my $file (@files){
      
      open CSVFILE, "<$localCSV" or die "cant open $localCSV";
      <CSVFILE>; # skip the first line
+     my $k=0;
      while (<CSVFILE>){
+         $k++;
          chomp;
 	 $_=~ s/^\s+//;
          my ($fname,$xmin,$xmax,$ymin,$ymax)=split(/,/,$_);
 	 print "$fname,$xmin,$xmax,$ymin,$ymax\n";
 
-         $fname =~ s/\.\///;
-	
+         my $fname_remote=$fname;
+         #$fname =~ s/\.\///;
+         # remove any preceeding path just leaving the filename 
+         $fname =~ s/.+\///;
+
          # skip this file if none of the corner points are in the polygon of interest
          # or vice-versa
          my $inpoly;
@@ -162,7 +167,7 @@ foreach my $file (@files){
 	 $haveit=1 if (-f $localLaz);
          if ($haveit==1 and $addfile==1) {
             my $sizeOnDisk= -s "$localLaz";
-            my $sizeOnFtp=$ftp->size($fname);
+            my $sizeOnFtp=$ftp->size($fname_remote);
             $haveit=0 unless ($sizeOnDisk == $sizeOnFtp);
             print "we have $fname, $sizeOnDisk bytes, but its $sizeOnFtp bytes on ftp\n"  if ($haveit==0);
             print "updating $fname\n" if ($haveit==0);
@@ -172,12 +177,12 @@ foreach my $file (@files){
          # if its in the area and we dont have it, download it first then add it to the list
          if ($addfile) {
              unless ($haveit) {
-		 my $size=$ftp->size($fname);
+		 my $size=$ftp->size($fname_remote);
 		 print "downloading $fname $size bytes\n";
                  print "|------------|------------|------------|------------|\n";
 		 my $sharpSize=int($size/54);
 		 $ftp->hash(\*STDOUT,$sharpSize);
-		 $ftp->get($fname,$localLaz) or die "get failed", $ftp->message;
+		 $ftp->get($fname_remote,$localLaz) or die "get failed", $ftp->message;
 		 print "\n";
              }
 	     push (@lazList,$localLaz);
