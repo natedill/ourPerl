@@ -2637,8 +2637,7 @@ sub getLeafIndex{
   
    my $index=$obj->{LASTINDX};
    $index=0 if ($index <0);
-   
-
+  
    # check the last index that found a point first
     $obj->_getLeafIndex($x,$y,$recurseDepth,$index);
     return $obj->{LASTINDX} if ($obj->{POINTCOUNTED});
@@ -2647,11 +2646,12 @@ sub getLeafIndex{
    # tree checking the parent/siblings, grandparents/cousins ... 
     while ($index>=0) {
       $index=$obj->{PARENT}[$index];
+  last unless (defined $index);
       $obj->_getLeafIndex($x,$y,$recurseDepth,$index);
       return $obj->{LASTINDX} if ($obj->{POINTCOUNTED});
     }
 
-
+    return -1;
 
 
 }
@@ -2678,10 +2678,10 @@ sub _getLeafIndex{
 
        my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
 
-       return unless ($y <= $north);
-       return unless ($y >= $south);
-       return unless ($x >= $west);
-       return unless ($x <= $east);
+       return -1 unless ($y <= $north);
+       return -1 unless ($y >= $south);
+       return -1 unless ($x >= $west);
+       return -1 unless ($x <= $east);
 
        # check if this is a leaf node
        my $dy=$north-$south;
