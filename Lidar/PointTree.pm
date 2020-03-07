@@ -1115,7 +1115,7 @@ sub writePointPlacemark{
    my $pmark='';
    $pmark.= "     <Placemark>\n";
    $pmark.= "        <name>$zstr</name>\n";
-   $pmark.= "        <styleUrl>../doc.kml#Style$style</styleUrl>\n";
+   $pmark.= "        <styleUrl>../p_doc.kml#Style$style</styleUrl>\n";
    $pmark.= "        <description>\n";
    #$pmark.= "         <p><b>$desc</b></p>\n";
    my $elevstring=sprintf ("%7.3f",$z);
