@@ -24,8 +24,6 @@ my $report=1;
 
 my ($q,$qmin,$qmax,$reportString)=qover($Hs,$hc,$h,$cotAlpha,$s,$g,$report);
 
-
-
 ####################################################
 # sub qover
 #
@@ -49,6 +47,21 @@ sub qover {
 
    my ($Hs,$hc,$h,$cotAlpha,$s,$g,$report)=@_;
 
+   # check for negtive freeboard
+   # if it is, determine overtopping rate with zero freeboard and add 
+   # critical flow for a broad crested weir 
+   # i.e. assume flow goes through critical depth that is 2/3 the negative freeboard value
+   my $qweir=0;
+   my $isAddWeirFlow=0;
+   my $cWeir=1.0;  # weir discharge coefficient
+   my $hc_org=$hc;
+   if ($hc < 0){
+      my $hc_weir=-$hc;
+      $hc=0;
+      $qweir=$cWeir*(2/3)*$hc_weir*((2/3)*$hc_weir*$g)**0.5;
+      $isAddWeirFlow++;
+   }
+
 
    my $A0=3.4 - 0.734*$cotAlpha + 0.239*$cotAlpha**2 - 0.0162*$cotAlpha**3;
    my $B0=2.3 - 0.5*$cotAlpha +0.15*$cotAlpha**2 - 0.011*$cotAlpha**3;
@@ -68,6 +81,12 @@ sub qover {
       $qmax=$q* $qstar**(-1/3);
    }
 
+   if  ($isAddWeirFlow){
+      $q+=$qweir;
+      $qmax+=$qweir;
+      $qmin+=$qweir;
+   }
+
    return ($q,$qmin,$qmax) unless (defined $report);
   
    my $unit = 'm';
@@ -77,7 +96,7 @@ sub qover {
    my $qmin_=sprintf('%0.4f',$qmin);
    my $qmax_=sprintf('%0.4f',$qmax);
    my $Hs_=sprintf('%0.4f',$Hs);
-   my $hc_=sprintf('%0.4f',$hc);
+   my $hc_=sprintf('%0.4f',$hc_org);
    my $h_=sprintf('%0.4f',$h);
    my $s_=sprintf('%0.4f',$s);
    my $cotAlpha_=sprintf('%0.4f',$cotAlpha);
@@ -92,7 +111,6 @@ Reference: 'Random Seas and Design of Maritime Structures' 3rd Edition,
               Advanced Series on Ocean Engineering - Vol.33
 
 $report
-
 _____________________________________________________________________________\n
           I N P U T S:
           ------------
@@ -127,11 +145,26 @@ _____________________________________________________________________________\n
    qmax=q* qstat**(-1/3) = $qmax\n";
    }
 
-$str.="
+
+ if ($isAddWeirFlow){
+    $str .= "
+!!!--  WARNING: Negative Freeboard  --!!!  
+ q is estimated as sum of critical broad-crested weir flow and overtopping assuming zero freeboard\n
+   qWeir=Cweir*(2/3)*hc*((2/3)*hc**g)**0.5;
+   Cweir = $cWeir 
+   qWier = $qweir
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" 
+
+ }
+
+
+ $str.="
            R E S U L T S:
            --------------\n
-   q = $q_ $unit^3/s/$unit\n";
+   q = $q_ $unit^3/s/$unit\n
+ ";
 
+ 
  if ($cotAlpha < 0.0001){
       $str.="\n
    Reliable range for vertical wall\n 
@@ -142,12 +175,21 @@ $str.="
    $qmin_ <-- $q_ --> $qmax_  $unit^3/s/$unit\n";
    }
 
-   print "$str\n";
+  # print "$str\n";
   
    return ($q,$qmin,$qmax,$str);
 }
 
 
+# calculate vertical wall mean wave overtopping rate by the Franco and Franco method
+
+sub franco_franco {
+ my ($Hs,$hc,$g,$report)=@_;
+ my $a=0.082;
+ my $b=3.0;
+ my $q=$a * exp (-$b*$hc/$Hs)  * ($g*$Hs**3)**0.5;
+ return $q;
+}
 
 
 # Matlab style
