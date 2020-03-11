@@ -2085,6 +2085,7 @@ sub cropGrid {
  
    # write boundary conditions
    print OUT "0\n0\n0\n0\n";
+   close OUT;
 
    return ($ne,$np,@foundNodes);
             
