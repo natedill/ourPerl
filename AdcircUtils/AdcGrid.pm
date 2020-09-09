@@ -1140,7 +1140,7 @@ sub findNodesInPoly{
    }
    my $miny=$PY[0];
    my $maxy=$PY[0];
-   foreach my $y (@PX){
+   foreach my $y (@PY){
       $miny=$y if $y < $miny;
       $maxy=$y if $y > $maxy;
    }
