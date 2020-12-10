@@ -38,8 +38,8 @@ my $dontFillPoly=undef;#'dontFill.kml';    # a kml polygon file to specify an ar
 my $out63='DepressionsFilled.63';   # output fort.63 style file with three records
                                     # 1: original Z; 2: new Z; 3: the difference 
 
-my $eps=0.05;       # zero value will make filled areas perfectly level, > 0 will maintain some slope in filled areas
-my $drainElev=-2.5;     # nodes below this elevation act as "drains" and don't get filled in
+my $eps=0.000005;       # zero value will make filled areas perfectly level, > 0 will maintain some slope in filled areas
+my $drainElev=2.5;     # nodes below this elevation act as "drains" and don't get filled in
 
 
 
@@ -54,8 +54,11 @@ my $adcGrid=AdcGrid->new();
 $adcGrid->loadGrid($unfilledGrid);
 
 # generate neighbor table
-my $neitab=$adcGrid->genNeighborTables;
+my ($neitab,$node2Ele)=$adcGrid->genNeighborTables;
 my @NEITAB=@{$neitab};
+
+
+
 
 # get the nodal depths 
 my $np = $adcGrid->getVar('NP');
@@ -70,6 +73,7 @@ foreach my $n (1..$np){
    my $maxNeighborDp=-999999999;
    my $minNeighborDp=99999999;
    foreach my $nei (@{$NEITAB[$n]}){
+print "node $n, nei $nei, DP $DP[$nei]\n";
       $maxNeighborDp=$DP[$nei] if $DP[$nei] > $maxNeighborDp;
       $minNeighborDp=$DP[$nei] if $DP[$nei] < $minNeighborDp;
    }
