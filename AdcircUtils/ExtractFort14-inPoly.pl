@@ -17,13 +17,8 @@ my $outGrid='cropped-fort.14';
 ######################################################################
 
 
-
-my ($line1,$line2,$line3);
-
-
 # load the grid
 my $adcGrid = AdcGrid->new($gridfile);
-my $pnp=$adcGrid->getVar('NP');
 
 
 # read the polygon
