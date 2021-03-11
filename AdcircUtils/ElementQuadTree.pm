@@ -1466,7 +1466,36 @@ sub triInterp {  # $xp $yp \@x \@y \@z
 
 }
 
-      
+     
+#############################################################
+# the whole triInterp99999 function - returns -99999 if any z values are less than -9998
+sub triInterp99999 {  # $xp $yp \@x \@y \@z
+
+   my $xp = $_[0];
+   my $yp = $_[1];
+   my @x = @{$_[2]}; # dereference to get arrays from argument
+   my @y = @{$_[3]};
+   my @z = @{$_[4]};
+
+   return -99999 if ($z[0] < -9998 or $z[1] < -9998 or $z[2] < -9998);
+
+
+   my $xx1=$x[1]-$x[0];
+   my $xx2=$x[2]-$x[0];
+   my $yy1=$y[1]-$y[0];
+   my $yy2=$y[2]-$y[0];
+   my $xxp=$xp-$x[0];
+   my $yyp=$yp-$y[0];
+
+   my $det=$yy2*$xx1 - $xx2*$yy1;
+   my $t=($xxp*$yy2 - $xx2*$yyp)/$det;
+   my $u=($xx1*$yyp - $yy1*$xxp)/$det;
+
+   return my $vp= $z[0] + $t*($z[1]-$z[0]) + $u*($z[2]-$z[0]);
+
+}
+
+
 
 #################################
 sub locat_chk { # $x $y \@px \@py   
@@ -1635,6 +1664,113 @@ sub _getZvalue {
 
 }
 	
+#######################################################
+# $zValue = $tree->getZvalue99999(            # public method
+#                    -ZDATA=>\@ZDATA,
+#                    -XX=>$longitude,
+#                    -YY=>$latitude,
+#                 ) 
+#   input is a hash
+#
+# interpolates values of @ZDATA at xx,yy
+# @ZDATA should be indexed by node number.
+# i.e. @ZDATA[1] is for node 1
+#      @ZDATA[0] is undefined
+##############################################
+sub getZvalue99999 {
+	my $obj=shift;
+	my %args=@_;
+
+	my $xx=$args{-XX};
+	my $yy=$args{-YY};
+        $obj->{ZVALUE}=undef;
+
+        $obj->{ZDATA}=$args{-ZDATA} 	if ($args{-ZDATA});
+
+	# try the last tree node first, before starting from the top of the tree
+        if ($obj->{LASTINDEX} > 0) {         
+            $obj->_getZvalue($obj->{LASTINDEX},1,$xx,$yy);
+	    return $obj->{ZVALUE} if defined $obj->{ZVALUE};
+        }
+
+	# start from the top if we didn't get it above
+        $obj->_getZvalue(0,1,$xx,$yy);  
+	return $obj->{ZVALUE};
+}
+
+sub _getZvalue {
+	my ($obj,$index,$depth,$xx,$yy)=@_;
+	# print "getting index $index\n";
+        my $zz=undef;
+	my $inRegion=0;
+	my ($north, $south, $east, $west) = @{$obj->{REGION}[$index]};
+        	
+ 
+	if ($yy <= $north) {    # check of lowest y is below north
+         if ($yy >= $south) {    # if highest y is above south
+          if ($xx >= $west)  {    # if highest x is right of west
+	   if ($xx <= $east)  {    # if lowest x is left of east
+ 		   $inRegion=1;
+		   #	 print "in Region\n";
+		   
+           }
+	  }
+	 }
+	}	
+
+        return unless ($inRegion);
+
+        my @kids = @{$obj->{CHILDREN}[$index]};   
+
+        if (@kids) {  #  this node has children, keep going
+	  
+          foreach my $kid (@kids) {
+
+              $zz=$obj->_getZvalue($kid,$depth+1,$xx,$yy);
+
+	  }
+	  return;
+	  
+        }else{   # here if its a leaf node do the interpolation
+	
+	   # loop over elements
+           my $cnt=$obj->{NELEMS}[$index];
+          while ($cnt--) {
+             my $elem=vec($obj->{ELEMIDS}[$index],$cnt,32);
+
+             my $n1=vec($obj->{N1},$elem,32);
+             my $n2=vec($obj->{N2},$elem,32);
+             my $n3=vec($obj->{N3},$elem,32);
+
+             my @x = ($obj->{XNODE}[ $n1 ],
+                   $obj->{XNODE}[ $n2 ],
+                   $obj->{XNODE}[ $n3 ] );
+             my @y = ($obj->{YNODE}[ $n1 ],
+                   $obj->{YNODE}[ $n2 ],
+                   $obj->{YNODE}[ $n3 ] );
+
+	   # print "X: @x\n";
+	   # print "Y: @y\n";
+	   # print "Z: @x\n";
+
+            
+             # check to see if this point in in the element
+	     my $inPoly = &locat_chk($xx, $yy, \@x, \@y);
+          
+	     if ($inPoly) { 
+		    
+                my @z = ($obj->{ZDATA}[ $n1 ],  # get the zvalues need to dereference?
+                         $obj->{ZDATA}[ $n2 ],
+                         $obj->{ZDATA}[ $n3 ] );
+
+	        $obj->{ZVALUE} = &triInterp99999($xx, $yy, \@x, \@y, \@z);
+		$obj->{LASTINDEX}=$index;
+		return;
+             }
+          }
+      } #end if kids
+
+}
 
 
 
