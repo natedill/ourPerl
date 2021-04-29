@@ -1689,16 +1689,16 @@ sub getZvalue99999 {
 
 	# try the last tree node first, before starting from the top of the tree
         if ($obj->{LASTINDEX} > 0) {         
-            $obj->_getZvalue($obj->{LASTINDEX},1,$xx,$yy);
+            $obj->_getZvalue99999($obj->{LASTINDEX},1,$xx,$yy);
 	    return $obj->{ZVALUE} if defined $obj->{ZVALUE};
         }
 
 	# start from the top if we didn't get it above
-        $obj->_getZvalue(0,1,$xx,$yy);  
+        $obj->_getZvalue99999(0,1,$xx,$yy);  
 	return $obj->{ZVALUE};
 }
 
-sub _getZvalue {
+sub _getZvalue99999 {
 	my ($obj,$index,$depth,$xx,$yy)=@_;
 	# print "getting index $index\n";
         my $zz=undef;
@@ -1726,7 +1726,7 @@ sub _getZvalue {
 	  
           foreach my $kid (@kids) {
 
-              $zz=$obj->_getZvalue($kid,$depth+1,$xx,$yy);
+              $zz=$obj->_getZvalue99999($kid,$depth+1,$xx,$yy);
 
 	  }
 	  return;
