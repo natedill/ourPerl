@@ -393,6 +393,10 @@ sub returnValue{
        $RP[0]=$rp_;
    }
    foreach my $rp (@RP){
+      if ($rp*$lambda <= 1){  # not enough records to deteremin relatively frequent return periods
+        push @X, -99.9;
+        next;
+      }
       my $y;
       if (($distType =~ /GUMBEL/) or ($distType eq 'FT-I')){
          $y = -1*log(-1*log(1-1/($lambda*$rp)));
@@ -477,9 +481,20 @@ sub WISoneLinePOT{
     my $windOrWave=lc($args{-WINDORWAVE});
     my $magIndex=9;  # these are defaults for wave analysis, wind spd and dir are 4,5, respectively
     my $dirIndex=15;
+    my $tpIndex=11;
     if ($windOrWave =~ m/wind/){
        $magIndex=4;  
        $dirIndex=5;
+    }
+    if ($windOrWave =~ m/seas/){
+       $magIndex=17;  
+       $dirIndex=23;
+       $tpIndex=19;
+    }
+    if ($windOrWave =~ m/swell/){
+       $magIndex=25;  
+       $dirIndex=31;
+       $tpIndex=27;
     }
   
 
@@ -539,7 +554,7 @@ sub WISoneLinePOT{
        push @T, $data[0];
        my $hs = $data[$magIndex];
        my $dir = $data[$dirIndex];
-       my $tp= $data[11];
+       my $tp= $data[$tpIndex];
        $station = $data[1];
        $lat = $data[2];
        $lon = $data[3];
