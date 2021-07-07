@@ -41,6 +41,7 @@ use warnings;
 
 use lib 'c:\ourPerl';   # only needed foro NOAA_gauge_POT
 use Date::Pcalc;        # only needed foro NOAA_gauge_POT
+use Math::Trig;
 
 #################################################################
 # sub read_stats
@@ -457,7 +458,9 @@ sub returnValue{
 #                     -HALFSECTOR => $halfSectorWidth,
 #                     -RECORDFREQ => $recsPerHour,
 #                     -MINEVENTDURATION => $minEventDuration,
-#                     -WINDORWAVE=>'wind'        
+#                     -WINDORWAVE=>'wind',
+#                     -GRAVACCEL => 9.81,  # default is metric, use 32.2 if imperial
+#                     -DEPTH => 50         # depth used to determine wave steepness (for later extreme periods)
 #                   )  
 #
 
@@ -476,22 +479,27 @@ sub WISoneLinePOT{
     my $minEventDuration = 1;
     $minEventDuration = $args{-MINEVENTDURATION} if defined ($args{-MINEVENTDURATION});
     $minEventDuration=$minEventDuration*$recsPerHour;
+    my $gravAccel=9.81;
+    $gravAccel = $args{-GRAVACCEL} if defined ($args{-GRAVACCEL});
+    my $depth=9999999999999999;
+    $depth = $args{-DEPTH} if defined ($args{-DEPTH});
+
     
    
     my $windOrWave=lc($args{-WINDORWAVE});
     my $magIndex=9;  # these are defaults for wave analysis, wind spd and dir are 4,5, respectively
     my $dirIndex=15;
     my $tpIndex=11;
-    if ($windOrWave =~ m/wind/){
+    if ($windOrWave =~ m/wind/i){
        $magIndex=4;  
        $dirIndex=5;
     }
-    if ($windOrWave =~ m/seas/){
+    if ($windOrWave =~ m/seas/i){
        $magIndex=17;  
        $dirIndex=23;
        $tpIndex=19;
     }
-    if ($windOrWave =~ m/swell/){
+    if ($windOrWave =~ m/swell/i){
        $magIndex=25;  
        $dirIndex=31;
        $tpIndex=27;
@@ -529,6 +537,11 @@ sub WISoneLinePOT{
     }else{
         print LOG "#       Analysis of Significant Wave Height                     #\n\n";   
            print  "#       Analysis of Significant Wave Height                     #\n\n";   
+        print LOG "#                       SEAS                                    #\n\n"   if ($windOrWave =~ m/seas/i);
+           print  "#                       SEAS                                    #\n\n"   if ($windOrWave =~ m/seas/i);
+        print LOG "#                       SWELL                                   #\n\n"   if ($windOrWave =~ m/swell/i);
+           print  "#                       SWELL                                   #\n\n"   if ($windOrWave =~ m/swell/i);
+   
     }   
 
     # ingest the oneline file 
@@ -862,10 +875,13 @@ sub WISoneLinePOT{
     my @sorted_i = sort {$PEAKS[$b] <=> $PEAKS[$a]} (0..$#PEAKS);
 
                #123456789012345678901234567890123456789012345678901234567890123456789012
-    print LOG "#------------------------------- Rank Ordered Peak Values ------------------------------------#\n";
-    print LOG "Rank, Hsig (m),     Time of Peak ,     Upcross Time ,   Downcross Time , Duration,   Dir,    Tp\n";
+    print LOG "#------------------------------- Rank Ordered Peak Values --------------------------------------------#\n";
+    print LOG "Rank, Hsig (m),     Time of Peak ,     Upcross Time ,   Downcross Time , Duration,   Dir,    Tp,  steep\n";
 
     my $rank=1;
+    my $meanSteep=0;
+    my $stpKnt=0;
+    my $steepness=99.99;
     foreach my $i (@sorted_i){
        my $str=$PeakTimes[$i];
        $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
@@ -878,8 +894,13 @@ sub WISoneLinePOT{
        $str=$T[$DownCrosses[$i]];
        $str =~ m/(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
        my $dc="$1-$2-$3 $4:$5";
-  
-       $str=sprintf("%4d,%9.3f,  %16s,  %16s,  %16s,%9.1f, %5.1f, %5.2f",$rank,$PEAKS[$i],$t,$uc,$dc,$Duration[$i],$DIR_atPeak[$i],$TP_atPeak[$i]);
+
+       my ($mdeep,$hdeep,$l0,$stp,$l1)=&waveSteepness($PEAKS[$i],$TP_atPeak[$i],$depth,$gravAccel) if ($TP_atPeak[$i] > 0);
+       $steepness=$stp if (defined $stp);
+       $stpKnt++ if ($TP_atPeak[$i] > 0);
+       $meanSteep+=$steepness if ($TP_atPeak[$i] > 0);
+
+       $str=sprintf("%4d,%9.3f,  %16s,  %16s,  %16s,%9.1f, %5.1f, %5.2f, %6.4f",$rank,$PEAKS[$i],$t,$uc,$dc,$Duration[$i],$DIR_atPeak[$i],$TP_atPeak[$i],$steepness);
        print LOG "$str\n";
        #print OUT "$rank,$PEAKS[$i],$t,$uc,$dc,$Duration[$i],$DIR_atPeak[$i],$TP_atPeak[$i];\n";
        $rank++; 
@@ -887,7 +908,15 @@ sub WISoneLinePOT{
     my @Ordered=@PEAKS[@sorted_i];
     close (LOG);
 
-    return (\@Ordered,$lambda,$logFile);
+    $meanSteep=$meanSteep/$stpKnt if ($stpKnt > 0);
+   
+    #print "Mean Deepwater Wave Steepness = $meanSteep\n"; 
+    my @PTMS=@PeakTimes[@sorted_i];
+    my @DUR=@Duration[@sorted_i];
+    my @DIR_=@DIR_atPeak[@sorted_i];
+    my @TP_=@TP_atPeak[@sorted_i];
+
+    return (\@Ordered,$lambda,$logFile,$meanSteep,\@PTMS,\@DUR,\@DIR_,\@TP_);
 
 } # end WISoneLinePOT
 
@@ -1460,17 +1489,29 @@ sub NOAA_gauge_AnnualMax{
 
 ###############################################################
 # sub fitDistributions
+#  (\@Ordered,\@DISTTYPE,\@K,\@RSQ,\@MIR,\@DOL,\@REC,\@SLOPE,\@INTERCEPT,\@RP,\@RV,\@TP)=
+# e.g.   GodaXtreme::fitDistributions(\@Ordered,[10, 50, 100, 500],$lambda,$nu,$logFile,{-THRESHOLD => $threshold, -MEANSTEEP => $meanSteep, -GRAVACCEL => $g, -DEPTH => $depth});
 #
-# e.g.   GodaXtreme::fitDistributions(\@Ordered,[10, 50, 100, 500],$lambda,$nu,$logFile,$threshold);
-#
-#
+#   give meanSteep and g if you want to calc and report periods associated with wave heights
+#    based on given wavesteepness
 #
 
 
 
 sub fitDistributions{
-    my ($oref,$rpRef,$lambda,$nu,$logFile,$threshold)=@_;
+    my ($oref,$rpRef,$lambda,$nu,$logFile,$optArgs)=@_;
     my @Ordered=@{$oref};
+    my $threshold;
+    my $meanSteep;
+    my $g;
+    my $depth=99999999;
+    if (defined $optArgs){
+        my %args=%{$optArgs};
+        $threshold=$args{-THRESHOLD} if defined ($args{-THRESHOLD});
+        $meanSteep=$args{-MEANSTEEP} if defined ($args{-MEANSTEEP});
+        $g=$args{-GRAVACCEL} if defined ($args{-GRAVACCEL});
+        $depth=$args{-DEPTH} if defined ($args{-DEPTH});
+    }
     # sort Ordered in case it is not already
     my @sorted = sort {$b <=> $a} (@Ordered);
     @Ordered=@sorted;
@@ -1483,7 +1524,6 @@ sub fitDistributions{
     }else{
        $NOLOG=1;  # in the case that no logfile is given
     } 
-    
     open LOG, ">>$logFile" or die "ERROR:  GodaExtreme.pm:  fitDistributions:  cant open logfile $logFile for append\n"  unless ($NOLOG);
 
     my @RSQ;
@@ -1571,29 +1611,28 @@ sub fitDistributions{
     }
     # sort by best fit and write results
     my @Sorted = sort {$MIR[$a] <=> $MIR[$b]} (0..$#MIR);
-    my $str='';
+    my $strRP='';
     foreach my $rp (@RP){
-       $str.=sprintf("|%5d-yr ",$rp);
+       $strRP.=sprintf("|%5d-yr ",$rp);
     } 
     unless ($NOLOG){
       print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
-      print LOG "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print LOG "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $strRP#\n";
       print LOG "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
       print "#---------|-------|-------|-------|--------|--------|-------|--------|---------- RETURN VALUES --------------#\n";
-      print "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $str#\n";
+      print "# DisType |   k   |  r^2  |  MIR  |   DOL  |  REC   | Slope | Intcpt $strRP#\n";
       print "#---------|-------|-------|-------|--------|--------|-------|--------|---------|---------|---------|---------#\n";
     }
-    foreach my $i (@Sorted){
-         my @RV_=@{$RV[$i]};
-         my $str='';
-         foreach my $rv (@RV_){
-              $str.=sprintf("|%8.2f ",$rv);
-         }
-          my $str2=sprintf("|%8s | %5.2f |%6.3f |%6.3f |%7s |%7s |%6.3f |%6.3f  $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
-         print LOG "$str2\n" unless ($NOLOG);
-         print "$str2\n" unless ($NOLOG);
-
-    }
+    # foreach my $i (@Sorted){
+    #     my @RV_=@{$RV[$i]};
+    #     my $str='';
+    #     foreach my $rv (@RV_){
+    #          $str.=sprintf("|%8.2f ",$rv);
+    #     }
+    #      my $str2=sprintf("|%8s | %5.2f |%6.3f |%6.3f |%7s |%7s |%6.3f |%6.3f  $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
+    #     print LOG "$str2\n" unless ($NOLOG);
+    #     print "$str2\n" unless ($NOLOG);
+    # }
 
     # sort the fit parameters by MIR
     @DISTTYPE=@DISTTYPE[@Sorted];
@@ -1620,9 +1659,64 @@ sub fitDistributions{
        $a=shift @INTERCEPT; push @INTERCEPT, $a;
        $a=shift @RV; push @RV, $a;
     }
+    foreach my $i (0..$#Sorted){
+         my @RV_=@{$RV[$i]};
+         my $str='';
+         foreach my $rv (@RV_){
+              $str.=sprintf("|%8.2f ",$rv);
+         }
+          my $str2=sprintf("|%8s | %5.2f |%6.3f |%6.3f |%7s |%7s |%6.3f |%6.3f  $str|", $DISTTYPE[$i],$K[$i],$RSQ[$i],$MIR[$i],$DOL[$i],$REC[$i],$SLOPE[$i],$INTERCEPT[$i]);
+         print LOG "$str2\n" unless ($NOLOG);
+         print "$str2\n" unless ($NOLOG);
+    }
+    my @TP=();
+    if (defined $meanSteep){  # if we have a steepness, use it to calculate periods and write them out
+       print "#--------------------------------------------------------------------#------------ Peak Periods -------------#\n";
+       print LOG "#--------------------------------------------------------------------#------------ Peak Periods -------------#\n";
+       print LOG "#------------------------------------------------------------------- $strRP#\n";
+       print "#------------------------------------------------------------------- $strRP#\n";
+       print "#--------------------------------------------------------------------#---------|---------|---------|---------#\n";
+       print LOG"#--------------------------------------------------------------------#---------|---------|---------|---------#\n";
+       my @TryTP=();
+       my $t=0.1;
+       while ($t<20){
+           push @TryTP,$t;
+           $t+=0.1;
+       }
+       foreach my $rvrf (@RV){
+           my @RV_=@{$rvrf};
+           my @TP_=();
+           foreach my $rv (@RV_){
+               #print "rv $rv, mnstp $meanSteep, g $g\n";
+               # find the period that gives a local wavelength matching the mean steepness
+               my @Mdiff=();
+               foreach my $t (@TryTP){
+                  my ($m0,$h0,$l0,$m,$l)=waveSteepness($rv,$t,$depth,$g);
+                  push @Mdiff, abs($rv/$l - $meanSteep);
+               }
+               my @Si = sort {$Mdiff[$a] <=> $Mdiff[$b]} (0..$#Mdiff);
+               my $tp = $TryTP[$Si[0]];
+               #my $tp=(2.0*3.14159*($rv/$meanSteep)/$g)**0.5;
+               push @TP_,$tp;
+           }
+           push @TP,\@TP_;
+        }
+       foreach my $i (0..$#Sorted){
+          my @TP_=@{$TP[$i]};
+          my $str='';
+          foreach my $tp (@TP_){
+              $str.=sprintf("|%8.2f ",$tp);
+          }
+          my $str2=sprintf("| Period Assuming Wave Steepness = %6.4f -------------------------- $str|",$meanSteep);
+          print LOG "$str2\n" unless ($NOLOG);
+          print "$str2\n" unless ($NOLOG);
+       }
+    }
+
+
 
     close (LOG)  unless ($NOLOG);
-    return (\@Ordered,\@DISTTYPE,\@K,\@RSQ,\@MIR,\@DOL,\@REC,\@SLOPE,\@INTERCEPT,\@RP,\@RV);
+    return (\@Ordered,\@DISTTYPE,\@K,\@RSQ,\@MIR,\@DOL,\@REC,\@SLOPE,\@INTERCEPT,\@RP,\@RV,\@TP);
     
 
 
@@ -2039,6 +2133,71 @@ sub fitGumbel{
 
 
 
- 
+
+####################################################
+# sub waveSteepness
+#
+# my ($m0,$h0,$l0,$m,$l)=waveSteepness($waveHeight,
+#                                      $wavePeriod,
+#                                      $localDepth,
+#                                      $g
+#                                     );
+# $m0= deepwater wave steepness
+# $h0= deepwater wave height
+# $l0= deepwater wavelength
+# $m=  wave steepness at local depth
+# $l=  wave length at local depth
+#
+#  Reference:
+#
+#  R.G. Dean and R.A. Dalrymple. 2000.  Water
+#  Wave Mechanics for Engineers and Scientists. World 
+#  Scientific Publishing Company, River Edge New Jersy
+#
+#
+#  USACE (1985), Direct Methods for Calculating Wavelength, CETN-1-17
+#  US Army Engineer Waterways Experiment Station Coastel Engineerin 
+#  Research Center, Vicksburg, MS
+#
+#  also see CEM Part II-3 for discussion of shoaling coefficient
+sub waveSteepness {
+   my ($hs,$tp,$d,$g)=@_;
+   my $twopi=2*3.141592653589793;
+
+   # get deep water celerity
+   my $l0=$g*$tp*$tp/$twopi;
+
+   my $c0=$l0/$tp;
+   my $cg0=$c0/2.0; # deep water group velocity
+
+   # angular frequency
+   my $sigma=$twopi/$tp;
+
+   # use Hunt's (1979) approximation for Celerity 
+   my $y=$sigma*$sigma*$d/$g;
+   my $c=sqrt( $g*$d/($y+1.0/(1.0 + 0.6522*$y + 0.4622*$y**2.0 + 0.0864*$y**4.0 +0.0675*$y**5.0)) )**0.5;
+
+   # Hunt approximate wave length 
+   my $l=$c*$tp;
+
+   # determine n factor for local depth group velocity
+   my $n=0.5*(1.0 + 2.0*($twopi/$l)*$d/sinh(2.0*($twopi/$l)*$d)); # group factor Dean & Dalrympld (2000) eqn 4.82b
+
+   # local depth group velocity
+   my $cg=$n*$c;
+
+   # shoaling coefficient
+   my $k=($cg0/$cg)**0.5;
+
+   # get deep water wave height
+   my $h0=$hs/$k;
+
+   # deepwater wave steepness
+   my $m0=$h0/$l0;
+
+   # local steepness
+   my $m=$hs/$l;
+   return ($m0,$h0,$l0,$m,$l);
+}
 
 1;
