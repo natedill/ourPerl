@@ -77,8 +77,8 @@ my $south=$swlat;
 
  
 
-my @DATA=();
-
+my $binstr='';  # will be a large binary string to store the data
+my $nv=0;
 while (<IN>){
   chomp;
   if (substr($_,68,12) =~ m/(\d\d\d\d\d\d\d\d\d\d\d\d)/){
@@ -88,7 +88,12 @@ while (<IN>){
      $_ =~ s/^\s+//;
      $_ =~ s/\s+$//;
      my @data=split(/\s+/,$_);
-     push @DATA, @data;
+     #push @DATA, @data;
+     foreach my $d (@data){
+        my $packed=pack("f",$d);
+        $binstr .= $packed;
+        $nv++;
+     }
   }
 
 
@@ -98,7 +103,16 @@ while (<IN>){
 close(IN);
 
 # get the data limits
-my ($cll,$cul)=minMax(\@DATA);
+#my ($cll,$cul)=minMax(\@DATA);
+my $cll=999999;
+my $cul=-999999;
+foreach my $off (0..$nv-1){
+    my $val=unpack("f",substr($binstr,$off,4));
+    $cll=$val if $val < $cll;
+    $cul=$val if $val > $cul;
+}
+
+
 if ($fort222 =~ m/\.222$/){
    my $maxxx=($cul*$cul +$cul*$cul)**0.5;
    $cul=$maxxx if $maxxx > $cul;
@@ -134,7 +148,8 @@ foreach my $dt (@DT){
       my $i=0;
       while ($i < $ilon){  
           my $c=$rec*$ilat*$ilon + $j*$ilon + $i;
-          push @WX, $DATA[$c];
+          #push @WX, $DATA[$c];
+          push @WX, unpack("f",substr($binstr,$c,4));
           $i++;
       }
       $j--;
@@ -149,7 +164,8 @@ foreach my $dt (@DT){
       my $i=0;
       while ($i < $ilon){  
           my $c=$rec*$ilat*$ilon + $j*$ilon + $i;
-          push @WY, $DATA[$c];
+          #push @WY, $DATA[$c];
+          push @WY, unpack("f",substr($binstr,$c,4));
           $i++;
       }
       $j--;
