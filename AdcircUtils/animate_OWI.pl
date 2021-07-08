@@ -15,26 +15,33 @@ my $pi=atan2(0,-1);
 my $deg2rad=$pi/180.0;
 
 
-my $fort222='fort_0032.222';
+my $fort222='fort.221';
 
 my $kmzFile="$fort222".'.kmz';
 
 # some settings to control colors on plot
 my $cmapFile='c:\ourPerl\jet.txt';  # file containing the colormap. See "sub loadColormap" for file format
 my $numColors=20;
-my $alpha=50;
+my $alpha=255;
  # vectors
  my $vecSpacing=30;  # pixels 
  my $minVecLength =5 ; # pixel 
  my $maxVecLength = 50; # pixels
 
 
-my $framesDir='OWI_wind_files';
-my $cbarTitle='Wind Velocity (m/s)';
+my $framesDir='OWI_PRE_files';
+$framesDir='OWI_WND_files' if ($fort222 =~ m/\.222$/);
+my $cbarTitle='sea level pressure (millibars)';
+$cbarTitle='Wind Speed (m/s)' if ($fort222 =~ m/\.222$/);
+
 
 
 
 #################################################### end config
+
+ 
+
+my $kmzFile="$fort222".'.kmz';
 
 
 mkdir "$framesDir";
@@ -83,14 +90,24 @@ while (<IN>){
      my @data=split(/\s+/,$_);
      push @DATA, @data;
   }
+
+
+
 }
 
 close(IN);
 
 # get the data limits
 my ($cll,$cul)=minMax(\@DATA);
-$cll=0.1;
+if ($fort222 =~ m/\.222$/){
+   my $maxxx=($cul*$cul +$cul*$cul)**0.5;
+   $cul=$maxxx if $maxxx > $cul;
+   $maxxx=($cll*$cll +$cll*$cll)**0.5;
+   $cul=$maxxx if $maxxx > $cul;
+   $cll=0.0000000000001;
+}
 print "minmax: $cll, $cul\n";
+
 
 
 # get time difference between records for making timestamps
@@ -104,14 +121,13 @@ my ($D_y,$D_m,$D_d, $Dh,$Dm,$Ds) = Date::Pcalc::Delta_YMDHMS($1,$2,$3,$4,$5,0,$6
 
 
 # now we've read all the data, make the pngs
-mkdir "files";
-my @PNGNAMES=();
 my @TIMESPANS=();
 my @KMLNAMES=();
 
 my $rec=0;
 foreach my $dt (@DT){
    # re-order the data from bottom up to top down
+   my $pngName="$dt".'.png';
    my @WX=();
    my $j=$ilat-1;
    while ( $j > 0 ){
@@ -125,6 +141,9 @@ foreach my $dt (@DT){
    }
    $rec++;          
    my @WY=();
+
+
+  if ($fort222 =~ m/\.222$/){
    $j=$ilat-1;
    while ( $j > 0 ){
       my $i=0;
@@ -136,6 +155,7 @@ foreach my $dt (@DT){
       $j--;
    }
    $rec++;
+ 
 
    my @Mag=();
    my @DIR=();
@@ -151,11 +171,13 @@ foreach my $dt (@DT){
        push @DIR, $dir; 
    }
 
-   my $pngName="$dt".'.png';
 
    my $azimuth=0;
    MakePNG::Raster_wVectors("$framesDir/$pngName",$ilon,$ilat,$numColors,$alpha,$cll,$cul,$cmap,\@Mag,\@DIR,$azimuth,$vecSpacing,$minVecLength,$maxVecLength);
-
+ }else{ # end if 222
+   MakePNG::raster("$framesDir/$pngName",$ilon,$ilat,$numColors,$alpha,$cll,$cul,$cmap,\@WX);
+ }
+   
 
    # figure the timespan
    $dt =~ /(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/;
@@ -185,8 +207,8 @@ MakePNG::makeColorbar("$framesDir/colorbar.png",$cbarTitle,$numColors,$cmap,$cll
 
 # write the kml
 # make the timeSpan file linking them all together, and zip it all up
-    my $kmldoc=$kmzFile;
-    $kmldoc =~ s/kmz$/kml/;
+    my $kmldoc='doc.kml';
+    #$kmldoc =~ s/kmz$/kml/;
     open KML, ">$kmldoc";
     print KML "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n";
     print KML "    <Document>\n";
@@ -248,7 +270,6 @@ MakePNG::makeColorbar("$framesDir/colorbar.png",$cbarTitle,$numColors,$cmap,$cll
     unlink $kmldoc;
     rmtree($framesDir);
    
-
 
 
 
