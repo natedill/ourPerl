@@ -4,7 +4,7 @@ use warnings;
 
 # make a kml animation of a OWI fort.222 file
 
-use lib 'c:\ourPerl';
+use lib '/homeq/qrisq/ourPerl';
 use KML::MakePNG;
 use Date::Pcalc;
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
@@ -15,12 +15,12 @@ my $pi=atan2(0,-1);
 my $deg2rad=$pi/180.0;
 
 
-my $fort222='fort.221';
+my $fort222='fort.222';
 
 my $kmzFile="$fort222".'.kmz';
 
 # some settings to control colors on plot
-my $cmapFile='c:\ourPerl\jet.txt';  # file containing the colormap. See "sub loadColormap" for file format
+my $cmapFile='/homeq/qrisq/ourPerl/jet.txt';  # file containing the colormap. See "sub loadColormap" for file format
 my $numColors=20;
 my $alpha=255;
  # vectors
@@ -41,7 +41,6 @@ $cbarTitle='Wind Speed (m/s)' if ($fort222 =~ m/\.222$/);
 
  
 
-my $kmzFile="$fort222".'.kmz';
 
 
 mkdir "$framesDir";
@@ -77,11 +76,17 @@ my $south=$swlat;
 
  
 
-my $binstr='';  # will be a large binary string to store the data
+my $binfile="$fort222".'.$binfile';
+open BIN, ">$binfile";
+binmode(BIN);
 my $nv=0;
+#my $knt=0;
 while (<IN>){
   chomp;
+  $_.='                                                             ';
   if (substr($_,68,12) =~ m/(\d\d\d\d\d\d\d\d\d\d\d\d)/){
+     #$knt++;
+     #last if ($knt >20);
      push @DT, $1;
      print "$1\n";
   }else{
@@ -91,27 +96,38 @@ while (<IN>){
      #push @DATA, @data;
      foreach my $d (@data){
         my $packed=pack("f",$d);
-        $binstr .= $packed;
+        print BIN "$packed";
         $nv++;
+        if ($d =~ m/nan/i){
+          die "found a nan\n";
+        }
+        die "d is $d undefined\n" unless (defined $d);
      }
+
   }
-
-
-
 }
 
+close(BIN);
 close(IN);
 
 # get the data limits
 #my ($cll,$cul)=minMax(\@DATA);
 my $cll=999999;
 my $cul=-999999;
+open BIN, "<$binfile";
+binmode(BIN);
+my $buf;
 foreach my $off (0..$nv-1){
-    my $val=unpack("f",substr($binstr,$off,4));
+   read(BIN,$buf,4);
+   my $val=unpack("f",$buf);
+   if (defined $val){
     $cll=$val if $val < $cll;
     $cul=$val if $val > $cul;
+   }
+  # print "sbstr $sbstr\n";
+  # print " val is $val,  off is $off of nv $nv\n" unless (defined $val);
 }
-
+close(BIN);
 
 if ($fort222 =~ m/\.222$/){
    my $maxxx=($cul*$cul +$cul*$cul)**0.5;
@@ -137,9 +153,16 @@ my ($D_y,$D_m,$D_d, $Dh,$Dm,$Ds) = Date::Pcalc::Delta_YMDHMS($1,$2,$3,$4,$5,0,$6
 # now we've read all the data, make the pngs
 my @TIMESPANS=();
 my @KMLNAMES=();
-
+open BIN, "<$binfile";
+binmode(BIN);
 my $rec=0;
 foreach my $dt (@DT){
+   # read the binary string for this record
+   my $strlen=4*$ilon*$ilat;
+   $strlen=$strlen*2 if ($fort222 =~ m/\.222$/);
+   read(BIN,$buf,$strlen);   
+my $lln=length($buf);
+   print "buf len is $lln\n";
    # re-order the data from bottom up to top down
    my $pngName="$dt".'.png';
    my @WX=();
@@ -147,9 +170,10 @@ foreach my $dt (@DT){
    while ( $j > 0 ){
       my $i=0;
       while ($i < $ilon){  
-          my $c=$rec*$ilat*$ilon + $j*$ilon + $i;
+          my $c= $j*$ilon + $i;
+          #my $c=$rec*$ilat*$ilon + $j*$ilon + $i;
           #push @WX, $DATA[$c];
-          push @WX, unpack("f",substr($binstr,$c,4));
+          push @WX, unpack("f",substr($buf,$c*4,4));
           $i++;
       }
       $j--;
@@ -163,9 +187,9 @@ foreach my $dt (@DT){
    while ( $j > 0 ){
       my $i=0;
       while ($i < $ilon){  
-          my $c=$rec*$ilat*$ilon + $j*$ilon + $i;
+          my $c=$ilat*$ilon + $j*$ilon + $i;
           #push @WY, $DATA[$c];
-          push @WY, unpack("f",substr($binstr,$c,4));
+          push @WY, unpack("f",substr($buf,$c*4,4));
           $i++;
       }
       $j--;
@@ -189,7 +213,7 @@ foreach my $dt (@DT){
 
 
    my $azimuth=0;
-   MakePNG::Raster_wVectors("$framesDir/$pngName",$ilon,$ilat,$numColors,$alpha,$cll,$cul,$cmap,\@Mag,\@DIR,$azimuth,$vecSpacing,$minVecLength,$maxVecLength);
+   MakePNG::raster_wVectors("$framesDir/$pngName",$ilon,$ilat,$numColors,$alpha,$cll,$cul,$cmap,\@Mag,\@DIR,$azimuth,$vecSpacing,$minVecLength,$maxVecLength);
  }else{ # end if 222
    MakePNG::raster("$framesDir/$pngName",$ilon,$ilat,$numColors,$alpha,$cll,$cul,$cmap,\@WX);
  }
@@ -285,6 +309,8 @@ MakePNG::makeColorbar("$framesDir/colorbar.png",$cbarTitle,$numColors,$cmap,$cll
     #clean up
     unlink $kmldoc;
     rmtree($framesDir);
+    close(BIN);
+    unlink "$binfile";
    
 
 
