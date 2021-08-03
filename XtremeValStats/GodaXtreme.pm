@@ -1024,6 +1024,9 @@ sub NOAA_gauge_POT{
        $firstline=0;
     }
     close(IN);
+    $beginDate=substr($T[0],0,8);
+    $endDate=substr($T[$#T],0,8);
+
    
     print LOG "  INFO read from COOPS file: $coopsFile\n";
     print LOG "     NOAA station:  $stationID\n";
@@ -1040,7 +1043,7 @@ sub NOAA_gauge_POT{
     $t = "$1-$2-$3 $4:$5";
     print LOG "     Last  Record: $t\n";
     my $nrecs=$#T+1;
-    print LOG "     Number of Records: $nrecs\n";
+    print LOG "     Number of Records in Full Duration: $nrecs\n";
     # check for missing data
     # fill in holes with dummy data below threshold
     print LOG "#----------------------------------------------------------------------#\n";
@@ -1049,6 +1052,7 @@ sub NOAA_gauge_POT{
     my $dt0=1/$recsPerHour;
     my $k=0;
     my $nt=$#T;
+    my $nMissingRecs=0;
     while ($k < $nt-1){
        my $hr=shift(@HR); push @HR,$hr;
        my $wse=shift(@WSE); push @WSE, $wse;
@@ -1064,11 +1068,15 @@ sub NOAA_gauge_POT{
               push @T,'0000-00-00';
               push @WSE,$threshold-100;
               $hr=$hr+$dt0;
+              $nMissingRecs++;
           }
           
        }
        $k++;
     }
+    $nrecs-=$nMissingRecs;
+    print "     Revised Number of Records:   $nrecs\n";# if ($nMissingRecs>0);
+
   
     open TMP,">dummiesFilledIn.csv";
     foreach my $k (0..$#WSE){
