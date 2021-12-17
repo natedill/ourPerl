@@ -5,6 +5,7 @@
 use strict;
 use warnings;
 use lib 'c:\ourPerl';    # change this to point to the path to your ourPerl directory
+use lib '/work/ourPerl';
 use AdcircUtils::AdcGrid;
 use AdcircUtils::ElementQuadTree;
 use Geometry::PolyTools;
@@ -14,7 +15,7 @@ use File::Path;
 #################### some set file names
 
 my $fort14 ='fort.14';  # name of ADCIRC grid file
-my $stations='elev_stat.151';  # name of file containing 
+my $stations='elev_stat.151';  # name of file containing
 
 
 ###########################
@@ -43,7 +44,7 @@ unless (-e $treefile){
 #$tree->interpPixels();
 #$tree->setDEMBLOCK(
 #                    -SETNAME=>'belv',
-                    #-ZDATA=>\@ZDATA,  
+                    #-ZDATA=>\@ZDATA,
 #                    -CLIM1=>-10,
 #                    -CLIM2=>10,
 #                    -PALETTE=>'c:\myPerl\jet.txt',
@@ -73,14 +74,14 @@ while (<IN>){
    #my ($source)=split(/\s+/,$desc);
    #next unless ( ($source eq 'USACE') or ($source eq 'NOAA') or ($source eq 'USGS') );
    my $setName="station-$k";
-   
+
    $coords =~ s/^\s+//;
    my ($xx, $yy) = split(/\s+/,$coords);
 
    my $eles_ref=$tree->findElements(-XX=>$xx,-YY=>$yy,-RADIUS=>$rad);
 
    next unless (@{$eles_ref});
-   
+
    my $north=$yy+$rad;
    my $south=$yy-$rad;
    my $east=$xx+$rad;
@@ -104,17 +105,17 @@ while (<IN>){
    $tree2->interpPixels();
    $tree2->setDEMBLOCK(
                     -SETNAME=>$setName,
-                    #-ZDATA=>\@ZDATA,  
+                    #-ZDATA=>\@ZDATA,
                     -CLIM1=>-2,
                     -CLIM2=>2,
-                    -PALETTE=>'c:\ourPerl\jet.txt',
+                    -PALETTE=>'/work/ourPerl/jet.txt',
                     -NUMCOLORS=>9,     # number of colors to display in png files for overlays
                     -MULT_ADJUST=>-1.0
                    );
    $tree2->writeKMLOverlay();
    $tree2->makeColorbar('elev');
    $tree2->writeKMLPoly('description');
-   
+
 
    my $zip = Archive::Zip->new();
    my $setDir="$setName".'_Files';

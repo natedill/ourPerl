@@ -40,7 +40,7 @@ mkdir "Files";
 &makeColorDots;
 
 
-# read the polygon 
+# read the polygon
 my $havePoly=0;
 my $pxref;
 my $pyref;
@@ -48,10 +48,10 @@ unless ($polygonFile eq ''){
    $havePoly=1;
    ($pxref,$pyref)=&readKmlPoly($polygonFile);
 }
-      
+
 
 # get min and max for color limits
-open FILE1, "<$xyzFile" or die "cant open $xyzFile\n";
+open FILE1, "<$xyzFile" or die "cant open xyzFIle $xyzFile\n";
 my $cnt=$headerlines;
 while ($cnt--){
   <FILE1>;
@@ -60,17 +60,17 @@ my $cll=99e99;
 my $cul=-99e99;
 
 
-# also read and store all the data in the polygon 
+# also read and store all the data in the polygon
 my @Lines;
 
 while (<FILE1>){
- 
+
    chomp ($_);
    $_=~ s/^\s+//;          # remove leading  whitespace
-   $_ =~ s/\s+$//;    
+   $_ =~ s/\s+$//;
    my @data = split(/\s+|,/,$_); # split on whitespace or comma
    my ($x,$y,$desc)=@data;
-  
+
    my $inpoly=1;
    if ($havePoly){
        $inpoly=&pointInPoly($x,$y,$pxref,$pyref);
@@ -81,13 +81,13 @@ while (<FILE1>){
    #$cul=$z if ( $z > $cul);
    push @Lines, $_;
 
-} 
+}
 close (FILE1);
 
 
 
 #open FILE, "<$xyzFile" or die "cant open $xyzFile\n";
-open OUT, ">$outkml" or die "cant open $outkml\n";
+open OUT, ">$outkml" or die "cant open outkml $outkml\n";
 
 
 #write initilization in kml
@@ -97,8 +97,8 @@ print OUT "   <Document>\n";
 
 #write styles
 my $color=0;
-while ($color<=255) {	 
-  my $style="Style$color";  
+while ($color<=255) {
+  my $style="Style$color";
   my $pngFile="$color.png";
   print OUT "    <Style id=\"$style\">\n";
   print OUT "      <IconStyle>\n";
@@ -117,7 +117,7 @@ while ($color<=255) {
 # loop through points in xyz file
 #while ($headerlines--){
 #  my $line= <FILE>;
-#  
+#
 #}
 
 #while (<FILE>){
@@ -147,7 +147,7 @@ foreach my $line (@Lines){
 
    my $style=1;
    $style = 255 if ($style > 255);
-   $style = 1   if ($style <1) ; 
+   $style = 1   if ($style <1) ;
    print OUT "     <Placemark>\n";
    print OUT "        <name></name>\n";
    print OUT "        <styleUrl>#Style$style</styleUrl>\n";
@@ -182,7 +182,7 @@ my $zip = Archive::Zip->new();
    unless ( $zip->writeToFileNamed($outkmz) == AZ_OK ) {
        die 'write error';
    }
- 
+
 
 
 unlink ($outkml);
@@ -207,23 +207,23 @@ unlink ($outkml);
 
 
 
-sub pointInPoly {  # $x $y \@px \@py    note: polygon described by vectors px,py must be closed 
-   
+sub pointInPoly {  # $x $y \@px \@py    note: polygon described by vectors px,py must be closed
+
    my $crs;
    my $inPoly=0;
-	
+
    my $x = $_[0];
    my $y = $_[1];
    my @px = @{$_[2]}; # dereference to get arrays from argument
    my @py = @{$_[3]};
-   
+
    my $nsegs=@px;
 
    my $wn=0;   # the winding number
 
    my $i=0;
    while ($i<$nsegs-1) {
-        
+
      # test if at least one vertex is right of the point
      if ( ($px[$i] > $x) ||  ($px[$i+1] > $x) ) {
 
@@ -250,7 +250,7 @@ sub pointInPoly {  # $x $y \@px \@py    note: polygon described by vectors px,py
 
 
 
-sub readKmlPoly { 
+sub readKmlPoly {
 
    my $polygonFile=shift;
    my @px;           # dereference to access arrays
@@ -284,7 +284,7 @@ sub readKmlPoly {
    }
 
    # remove the tags from the string
-   $coordString =~ /<coordinates>(.*)<\/coordinates>/; 
+   $coordString =~ /<coordinates>(.*)<\/coordinates>/;
    $coordString = $1;
    $coordString =~ s/^\s+//;
    $coordString =~ s/\s+$//;
@@ -295,7 +295,7 @@ sub readKmlPoly {
         my ($x,$y,$z)=split(/,/,$coord);
         push (@px,$x);
         push (@py,$y);
-   }     
+   }
 
    close PFILE;
    return (\@px,\@py);
@@ -311,7 +311,7 @@ sub readKmlPoly {
 #
 # this subroutine makes a bunch of png files with color dots
 #
-################################################ 
+################################################
 
 sub makeColorDots {
 
@@ -325,17 +325,17 @@ sub makeColorDots {
   while ($color>0) {
 
      my $im = new GD::Image($xpix,$ypix);
-        &setColors($im);	 
-      
-	
+        &setColors($im);
+
+
         my $i;
         my $j =  0;
-        my $cnt = 0;	
+        my $cnt = 0;
 	while ($j<$ypix) {
-	      $i=0;	
+	      $i=0;
               while ($i<$xpix) {
                     my $r = sqrt(($i-$imid)**2 + ($j-$jmid)**2);
-		     
+
 		    if ($r<$imid) {
                        $im->setPixel($i,$j,$color);   #set the pixel color based on the map
 	            }else{
@@ -362,7 +362,7 @@ sub makeColorDots {
 
 
 #####################################################
-# sub setColors() 
+# sub setColors()
 #
 # used by _makePNG to allocate the color map for png files
 ####################################################
@@ -628,10 +628,10 @@ sub setColors {
       $color[255] = $im->colorAllocateAlpha(128,0,0,$alpha);
       $color[256] = $im->colorAllocateAlpha(0,0,0,$alpha);
       $color[256] = $im->colorAllocateAlpha(0,0,0,$alpha);
-     
-     
-     
-      $im->transparent($color[0]);  
+
+
+
+      $im->transparent($color[0]);
       return (@color);
 }
 
