@@ -1043,7 +1043,7 @@ sub NOAA_gauge_POT{
     $t = "$1-$2-$3 $4:$5";
     print LOG "     Last  Record: $t\n";
     my $nrecs=$#T+1;
-    print LOG "     Number of Records in Full Duration: $nrecs\n";
+    print LOG "     Number of Record Read: $nrecs\n";
     # check for missing data
     # fill in holes with dummy data below threshold
     print LOG "#----------------------------------------------------------------------#\n";
@@ -1074,8 +1074,9 @@ sub NOAA_gauge_POT{
        }
        $k++;
     }
-    $nrecs-=$nMissingRecs;
-    print "     Revised Number of Records:   $nrecs\n";# if ($nMissingRecs>0);
+    #$nrecs-=$nMissingRecs;
+    #print "     Revised Number of Records:   $nrecs\n" if ($nMissingRecs>0);
+    #print LOG "     Revised Number of Records:   $nrecs\n" if ($nMissingRecs>0);
 
   
     open TMP,">dummiesFilledIn.csv";
