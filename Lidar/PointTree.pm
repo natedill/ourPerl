@@ -1442,7 +1442,7 @@ sub _bottomUp {
 #
 #################################################################
 sub makeColorbar {
-   my ($self,$title) = @_;
+   my ($self,$title,$cbarXpixYpix) = @_;
      
         my $numColors=16;  # the default	
    if (defined $self->{NUMCOLORS}) {
@@ -1453,6 +1453,10 @@ sub makeColorbar {
 
    my $xpix=550;
    my $ypix=100;
+   if (defined $cbarXpixYpix){
+       ($xpix,$ypix)=@{$cbarXpixYpix};
+   }
+   
    my $xMarg=15;
    my $yMarg=30;
    my $xWidth= ($xpix - 2*$xMarg);
@@ -1523,14 +1527,30 @@ sub makeColorbar {
 
    foreach $j ( $yMarg .. $ypix-$yMarg ) {
 
+       my $clast=-99;
+
        foreach $i ( $xMarg .. $xpix-$xMarg ) {
+          $clast=$C unless (defined $clast);
           my $C1= 128 * ($i-$xMarg)  / $xWidth+1;
           
          # $C= ($c-$self->{CLIM1})/$dzdc+1;       
           my $C= int(   (  int($numColors*($C1-1)/128)+0.5 )*128/$numColors)  unless ($C1==0);
           $C=128 if ($C > 128); 
-
- #print "i,c1,c $i  $C1  $C\n";
+      
+          # write tick where color changes 
+          if ($j == $yMarg+7){
+             unless ($C == $clast){
+                my $ytmp=$ypix-$yMarg;
+                foreach my $y ($ytmp-5 .. $ytmp+5) {              # tick marks
+                   $im->setPixel($i-1,$y,$black);
+                   $im->setPixel($i,$y,$black);
+                } 
+                my $dtmp = $self->{CLIM1} + ($i-1 - $xMarg)*$dClim/$xWidth; # tick label
+                my $tickLabel=sprintf("%0.1f",$dtmp);
+                $im->string(gdSmallFont,$i-11,$ytmp+6,$tickLabel,$black);
+                $clast=$C;
+             }
+          }
           $im->setPixel($i,$j,$colors[$C]);   #set the pixel color based on the map
 
        }      
@@ -1548,32 +1568,33 @@ sub makeColorbar {
     #   $label1->draw(250,10 , 0);
    
    # ticks on the bottom x-axis (speed)
-      my $dx=($xWidth)/$numColors;
-      
-      $dx=($xWidth)/20 if $numColors > 20;  # just to keep ticks from crowding eachother
-      
-      
-      
-      my $x=$xMarg-1;
-      my $x2=$xMarg+$xWidth;
-      my $ytmp=$ypix-$yMarg;
-
-      while ($x<=$x2){
-
-        my $intx=int($x);
-        #$x++ if ($x-$intx > 0.5);
-        foreach my $y ($ytmp-5 .. $ytmp+5) {              # tick marks
-              $im->setPixel($intx,$y,$black);
-              $im->setPixel($intx+1,$y,$black);
-        } 
-        
-        my $dtmp = $self->{CLIM1} + ($x - $xMarg)*$dClim/$xWidth;
-        
-        my $tickLabel=sprintf("%0.1f",$dtmp);
-        $im->string(gdMediumBoldFont,$intx-11,$ytmp+6,$tickLabel,$black);
-        $x=$x+$dx;            
-    
-      } 
+   #      my $dx=($xWidth)/$numColors;
+   #   
+   #    $dx=($xWidth)/20 if $numColors > 20;  # just to keep ticks from crowding eachother
+   #   
+   #   
+   #   
+   #   my $x=$xMarg-1;
+   #   my $x2=$xMarg+$xWidth;
+   #   my $ytmp=$ypix-$yMarg;
+   #
+   #   while ($x<=$x2){
+   #
+   #     my $intx=int($x);
+   #     #$x++ if ($x-$intx > 0.5);
+   #     foreach my $y ($ytmp-5 .. $ytmp+5) {              # tick marks
+   #           $im->setPixel($intx,$y,$black);
+   #           $im->setPixel($intx+1,$y,$black);
+   #     } 
+   #     
+   #     my $dtmp = $self->{CLIM1} + ($x - $xMarg)*$dClim/$xWidth;
+   #     
+   #     my $tickLabel=sprintf("%0.1f",$dtmp);
+   #     $im->string(gdSmallFont,$intx-11,$ytmp+6,$tickLabel,$black);
+   #     #$im->string(gdMediumBoldFont,$intx-11,$ytmp+6,$tickLabel,$black);
+   #     $x=$x+$dx;            
+   #  
+   #   } 
   
       
 

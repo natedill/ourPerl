@@ -82,7 +82,8 @@ sub printHeader {
    $recSize=16;
    read(FILE, $buf, $recSize);
    @data=unpack("L S S c8",$buf);  
-   printf "Project id = %u %u %u %c%c%c%c%c%c%c%c\n",@data;
+   print "data: @data\n";
+   #printf "Project id = %u %u %u %c%c%c%c%c%c%c%c\n",@data;
 
    # get version
    $recSize=2;

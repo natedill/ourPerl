@@ -438,14 +438,17 @@ sub _divideRegion {
 #######################################################
 # sub writeKMLPoly() -  public method
 #
+# $tree->writeKMLPoly ('DescriptionString' [,$minLOD,maxLOD]);
+#
+#
 # writes the tree in kml files with polygons 
 #######################################################
 sub writeKMLPoly{
 	my $obj = shift;
-	my ($descString)=@_;
+	my ($descString,$minLOD,$maxLOD)=@_;
 	mkdir("poly_Files");
 	print "writing kml polygons\n";
-	$obj->_writeKMLPoly(0,1,$descString);    # index, depth - for top layer
+	$obj->_writeKMLPoly(0,1,$descString,$minLOD,$maxLOD);    # index, depth - for top layer
 }
 
 
@@ -455,15 +458,18 @@ sub writeKMLPoly{
 #######################################################
 
 sub _writeKMLPoly{
-	my ($obj, $index, $depth, $descString) = @_;
-
+	my ($obj, $index, $depth, $descString, $lodmn,$lodmx) = @_;
 	return unless($obj->{NELEMS}[$index]);  # don't write kml for nodes that are empty
         
 	my $kmlFile;
 	my @kids = @{$obj->{CHILDREN}[$index]};
 	 
-        my $minLOD=128;
+    my $minLOD=128;
+    $minLOD=$lodmn if (defined $lodmn);
 	my $maxLOD=512;
+    $maxLOD=$lodmx if (defined $lodmx);
+
+
 #        if ($depth==1) {$minLOD=0;}
         unless (@kids) {$maxLOD=-1;}
 
@@ -612,7 +618,7 @@ sub _writeKMLPoly{
 	   
            next unless($obj->{NELEMS}[$kid]);  # don't write kml for tree nodes with no elemets under them
 
-	   $obj->_writeKMLPoly($kid, $depth+1,$descString);
+	   $obj->_writeKMLPoly($kid, $depth+1,$descString,$minLOD,$maxLOD);
 	
         }
 }
